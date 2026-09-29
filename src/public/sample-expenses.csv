@@ -1,0 +1,4 @@
+date,title,amount,category,paymentMethod,note
+2026-09-28,Groceries,850,Food & Groceries,UPI,Weekly groceries
+2026-09-27,Fuel,1500,Transport,Debit Card,
+2026-09-26,Electricity Bill,1200,Electricity & Utilities,Bank Transfer,Monthly bill

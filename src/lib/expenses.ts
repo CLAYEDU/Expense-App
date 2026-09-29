@@ -109,3 +109,21 @@ export async function deleteExpense(
 
   await deleteDoc(expenseRef);
 }
+
+export async function addExpensesBulk(
+  uid: string,
+  expenses: ExpenseInput[]
+) {
+  const results: string[] = [];
+
+  for (const expense of expenses) {
+    const id = await addExpense(uid, {
+      ...expense,
+      source: "csv",
+    });
+
+    results.push(id);
+  }
+
+  return results;
+}

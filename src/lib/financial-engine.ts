@@ -19,6 +19,7 @@ export interface CategoryBreakdown {
 }
 
 export interface FinancialAnalysis {
+  fixedCommitments: number;
   monthlyIncome: number;
 
   totalExpenses: number;
@@ -244,6 +245,7 @@ export function analyzeFinances(
 
   return {
     monthlyIncome: round(monthlyIncome),
+    fixedCommitments: round(plannedFixedOutflow),
 
     totalExpenses: round(totalExpenses),
     essentialExpenses: round(essentialExpenses),

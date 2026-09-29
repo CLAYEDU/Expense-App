@@ -21,8 +21,7 @@ export default function ExpensesPage() {
   const router = useRouter();
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [profile, setProfile] =
-    useState<FinancialProfile | null>(null);
+  const [profile, setProfile] = useState<FinancialProfile | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,11 +33,10 @@ export default function ExpensesPage() {
       setLoading(true);
       setError("");
 
-      const [expenseData, financialProfile] =
-        await Promise.all([
-          getExpenses(user.uid),
-          getFinancialProfile(user.uid),
-        ]);
+      const [expenseData, financialProfile] = await Promise.all([
+        getExpenses(user.uid),
+        getFinancialProfile(user.uid),
+      ]);
 
       if (!financialProfile) {
         router.replace("/setup");
@@ -49,9 +47,7 @@ export default function ExpensesPage() {
       setProfile(financialProfile);
     } catch (err) {
       console.error(err);
-      setError(
-        "Unable to load your expenses. Please try again."
-      );
+      setError("Unable to load your expenses. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -105,18 +101,27 @@ export default function ExpensesPage() {
             </h1>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
-              Keep your spending organized so your financial
-              plan can be based on your actual expenses.
+              Keep your spending organized so your financial plan can be based on your actual expenses.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            className="rounded-2xl border border-neutral-200 bg-white px-5 py-3 text-sm font-medium text-neutral-800 transition hover:bg-neutral-50"
-          >
-            Back to dashboard
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/expenses/import")}
+              className="rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-neutral-800"
+            >
+              Import CSV
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="rounded-2xl border border-neutral-200 bg-white px-5 py-3 text-sm font-medium text-neutral-800 transition hover:bg-neutral-50"
+            >
+              Back to dashboard
+            </button>
+          </div>
         </header>
 
         {error && (
