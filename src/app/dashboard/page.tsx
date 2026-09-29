@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -8,6 +8,12 @@ import { useAuth } from "@/components/auth-provider";
 import { getFinancialProfile } from "@/lib/financial-profile";
 import { getExpenses, type Expense } from "@/lib/expenses";
 import { getBudgets, DEFAULT_BUDGETS, type BudgetMap } from "@/lib/budgets";
+import { getGoals, getGoalProgress, type Goal } from "@/lib/goals";
+import {
+  getRecurringExpenses,
+  getRecurringStatus,
+  type RecurringExpense,
+} from "@/lib/recurring-expenses";
 
 import {
   analyzeFinances,
@@ -27,6 +33,7 @@ import RecommendationsPanel, {
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  ArrowRight,
   ChevronRight,
   LogOut,
   PiggyBank,
@@ -43,6 +50,10 @@ import {
   Compass,
   BellRing,
   Activity,
+  Flag,
+  Repeat,
+  AlertCircle,
+  X,
 } from "lucide-react";
 import { logoutUser } from "@/lib/auth";
 
@@ -71,7 +82,6 @@ export function TwoDPieChart({
 }: TwoDPieChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
-  // Safe fallback against null, undefined, or missing items
   const cleanData = (data ?? []).filter(
     (d) => d && typeof d.value === "number" && d.value > 0
   );
@@ -140,9 +150,7 @@ export function TwoDPieChart({
 
   return (
     <div className="flex flex-col items-center justify-between gap-8 lg:flex-row">
-      {/* 2D Donut Chart Viewport */}
       <div className="relative flex h-64 w-64 sm:h-72 sm:w-72 shrink-0 items-center justify-center">
-        {/* Soft Ambient Refraction Aura */}
         <div
           className="pointer-events-none absolute h-48 w-48 rounded-full blur-2xl transition-all duration-500"
           style={{
@@ -176,7 +184,6 @@ export function TwoDPieChart({
           })}
         </svg>
 
-        {/* Dynamic Center HUD Display */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center p-3">
           <div className="flex flex-col items-center justify-center rounded-full transition-all duration-300">
             {activeItem ? (
@@ -211,7 +218,6 @@ export function TwoDPieChart({
         </div>
       </div>
 
-      {/* Interactive Legend with Glass Pills */}
       <div className="flex w-full flex-col gap-2.5">
         {sectors.map((item) => {
           const isSelected = activeIdx === item.index;
@@ -270,10 +276,15 @@ export default function DashboardPage() {
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null);
   const [budgets, setBudgets] = useState<BudgetMap>(DEFAULT_BUDGETS);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showMobileActionMenu, setShowMobileActionMenu] = useState(false);
+
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const loadDashboard = useCallback(async () => {
     if (!user) return;
@@ -282,10 +293,18 @@ export default function DashboardPage() {
       setLoading(true);
       setLoadError("");
 
-      const [financialProfile, userExpenses, userBudgets] = await Promise.all([
+      const [
+        financialProfile,
+        userExpenses,
+        userBudgets,
+        userGoals,
+        userRecurringExpenses,
+      ] = await Promise.all([
         getFinancialProfile(user.uid),
         getExpenses(user.uid),
         getBudgets(user.uid),
+        getGoals(user.uid),
+        getRecurringExpenses(user.uid),
       ]);
 
       if (!financialProfile) {
@@ -296,6 +315,8 @@ export default function DashboardPage() {
       setProfile(financialProfile);
       setExpenses(userExpenses || []);
       setBudgets(userBudgets || DEFAULT_BUDGETS);
+      setGoals(userGoals || []);
+      setRecurringExpenses(userRecurringExpenses || []);
 
       const rawProfile = financialProfile as any;
       const engineInput: FinancialProfileForEngine = {
@@ -339,7 +360,50 @@ export default function DashboardPage() {
     loadDashboard();
   }, [authLoading, user, router, loadDashboard]);
 
-  // Compute live recommendations
+  // Handle closing mobile action dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowMobileActionMenu(false);
+      }
+    }
+
+    if (showMobileActionMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showMobileActionMenu]);
+
+  // Recurring Commitments Analytics
+  const activeRecurringExpenses = useMemo(
+    () => recurringExpenses.filter((item) => item.active),
+    [recurringExpenses]
+  );
+
+  const recurringMonthlyCommitment = useMemo(
+    () =>
+      activeRecurringExpenses.reduce((sum, item) => {
+        if (item.frequency === "Monthly") {
+          return sum + (Number(item.amount) || 0);
+        }
+        return sum + (Number(item.amount) || 0) / 12;
+      }, 0),
+    [activeRecurringExpenses]
+  );
+
+  const overdueRecurringExpenses = useMemo(
+    () =>
+      activeRecurringExpenses.filter(
+        (item) => getRecurringStatus(item) === "overdue"
+      ),
+    [activeRecurringExpenses]
+  );
+
   const recommendations: Recommendation[] = useMemo(() => {
     if (!profile) return [];
     const rawProfile = profile as any;
@@ -360,7 +424,6 @@ export default function DashboardPage() {
     });
   }, [profile, expenses, budgets]);
 
-  // Safe data shape for the 2D Donut Chart
   const pieData: PieSegment[] = useMemo(() => {
     if (!analysis) return [];
 
@@ -436,19 +499,16 @@ export default function DashboardPage() {
 
   return (
     <main className="relative min-h-screen bg-[#edf2ee] text-neutral-900 antialiased selection:bg-emerald-500/20 selection:text-emerald-900">
-      {/* ================= APPLE AMBIENT LIVING AURORA BACKGROUND ================= */}
+      {/* Ambient Aurora Glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        {/* Vibrant Emerald Aurora (Top-Right) */}
         <div className="absolute -top-32 -right-24 h-[600px] w-[600px] rounded-full bg-gradient-to-br from-emerald-400/50 via-teal-300/40 to-emerald-200/20 blur-[120px]" />
-        {/* Electric Mint Aurora (Left Edge) */}
         <div className="absolute top-[28%] -left-32 h-[650px] w-[650px] rounded-full bg-gradient-to-tr from-teal-400/40 via-emerald-300/35 to-cyan-300/30 blur-[130px]" />
-        {/* Soft Cyan Depth Aura (Bottom-Right) */}
         <div className="absolute -bottom-32 right-[15%] h-[550px] w-[550px] rounded-full bg-gradient-to-t from-cyan-300/40 via-emerald-200/30 to-transparent blur-[120px]" />
       </div>
 
-      {/* Apple Glass Frosted Top Navbar */}
+      {/* Top Header Navbar */}
       <header className="sticky top-0 z-30 border-b border-white/80 bg-white/60 shadow-[0_4px_30px_rgba(0,0,0,0.03),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-lg shadow-emerald-600/30">
               <Sparkles size={20} className="animate-pulse" />
@@ -464,26 +524,157 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push("/budget")}
-              className="flex items-center gap-1.5 rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
-            >
-              <Target size={15} className="text-emerald-700" />
-              <span className="hidden sm:inline">Add Budget</span>
-            </button>
+            {/* ================= LAPTOP VIEW (lg:flex) ================= */}
+            <div className="hidden lg:flex items-center gap-2">
+              <Link
+                href="/goals"
+                aria-label="Goals"
+                className="flex items-center gap-1.5 rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
+              >
+                <Flag size={15} className="text-teal-700" />
+                <span>Goals</span>
+              </Link>
 
-            <button
-              onClick={() => router.push("/expenses")}
-              className="flex items-center gap-1.5 rounded-2xl bg-[#173d32] px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-[#173d32]/25 transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95"
-            >
-              <Plus size={15} />
-              <span className="hidden sm:inline">Add Expense</span>
-            </button>
+              <Link
+                href="/recurring"
+                aria-label="Recurring Commitments"
+                className="flex items-center gap-1.5 rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
+              >
+                <Repeat size={15} className="text-emerald-700" />
+                <span>Commitments</span>
+              </Link>
 
-            {/* Notification Center Bell with Badge */}
+              <button
+                onClick={() => router.push("/budget")}
+                aria-label="Add Budget"
+                className="flex items-center gap-1.5 rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
+              >
+                <Target size={15} className="text-emerald-700" />
+                <span>Add Budget</span>
+              </button>
+
+              <button
+                onClick={() => router.push("/expenses")}
+                aria-label="Add Expense"
+                className="flex items-center gap-1.5 rounded-2xl bg-[#173d32] px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-[#173d32]/25 transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95"
+              >
+                <Plus size={15} />
+                <span>Add Expense</span>
+              </button>
+            </div>
+
+            {/* ================= MOBILE & TABLET VIEW (lg:hidden) ================= */}
+            <div className="relative lg:hidden" ref={mobileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
+                className={`flex items-center gap-1.5 rounded-2xl border px-3 py-2 text-xs font-bold shadow-sm backdrop-blur-md transition active:scale-95 ${
+                  showMobileActionMenu
+                    ? "border-emerald-500 bg-[#173d32] text-white shadow-emerald-700/20"
+                    : "border-white/90 bg-white/75 text-neutral-900 hover:bg-white"
+                }`}
+                aria-label="Quick Actions Menu"
+                title="Quick Actions"
+              >
+                <Plus
+                  size={16}
+                  className={`transition-transform duration-300 ${
+                    showMobileActionMenu ? "rotate-45 text-white" : "text-emerald-700"
+                  }`}
+                />
+                <span className="text-[11px] font-black uppercase tracking-tight">
+                  Actions
+                </span>
+              </button>
+
+              {/* Mobile Glass Popover Menu */}
+              {showMobileActionMenu && (
+                <div className="absolute right-0 top-12 z-50 w-64 origin-top-right overflow-hidden rounded-[28px] border border-white/85 bg-white/80 p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200">
+                  <div className="px-3 py-2 border-b border-black/5 flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                      Quick Deployment
+                    </span>
+                    <button
+                      onClick={() => setShowMobileActionMenu(false)}
+                      className="text-neutral-400 hover:text-neutral-700"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div className="mt-1 space-y-1">
+                    <button
+                      onClick={() => {
+                        setShowMobileActionMenu(false);
+                        router.push("/expenses");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition hover:bg-white/80 active:scale-98"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-800 shadow-sm">
+                        <Plus size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-neutral-900">Add Expense</p>
+                        <p className="text-[10px] font-semibold text-neutral-500">Record transaction outflow</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMobileActionMenu(false);
+                        router.push("/budget");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition hover:bg-white/80 active:scale-98"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-800 shadow-sm">
+                        <Target size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-neutral-900">Monthly Budget</p>
+                        <p className="text-[10px] font-semibold text-neutral-500">Set spending caps</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMobileActionMenu(false);
+                        router.push("/goals");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition hover:bg-white/80 active:scale-98"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/15 text-teal-800 shadow-sm">
+                        <Flag size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-neutral-900">Financial Goals</p>
+                        <p className="text-[10px] font-semibold text-neutral-500">Track savings milestones</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMobileActionMenu(false);
+                        router.push("/recurring");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition hover:bg-white/80 active:scale-98"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-800 shadow-sm">
+                        <Repeat size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-neutral-900">Commitments</p>
+                        <p className="text-[10px] font-semibold text-neutral-500">Recurring bills & EMIs</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Notifications Pill */}
             <Link
               href="/notifications"
-              className="relative rounded-2xl border border-white/90 bg-white/70 p-2.5 text-neutral-600 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-neutral-900"
+              className="relative rounded-2xl border border-white/90 bg-white/70 p-2 sm:p-2.5 text-neutral-600 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-neutral-900"
               title="Financial Insights & Notifications"
             >
               <BellRing size={17} />
@@ -494,17 +685,19 @@ export default function DashboardPage() {
               )}
             </Link>
 
+            {/* Calibration Setup */}
             <button
               onClick={() => router.push("/setup")}
-              className="rounded-2xl border border-white/90 bg-white/70 p-2.5 text-neutral-600 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-neutral-900"
+              className="rounded-2xl border border-white/90 bg-white/70 p-2 sm:p-2.5 text-neutral-600 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-neutral-900"
               title="Edit Profile Setup"
             >
               <SlidersHorizontal size={17} />
             </button>
 
+            {/* Sign Out */}
             <button
               onClick={() => setShowLogoutModal(true)}
-              className="rounded-2xl border border-white/90 bg-white/70 p-2.5 text-neutral-500 shadow-sm backdrop-blur-md transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+              className="rounded-2xl border border-white/90 bg-white/70 p-2 sm:p-2.5 text-neutral-500 shadow-sm backdrop-blur-md transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
               title="Sign out"
             >
               <LogOut size={17} />
@@ -515,7 +708,6 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="relative z-10 mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-        {/* Header Title */}
         <section className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/80 bg-white/80 px-3.5 py-1 text-xs font-bold text-emerald-800 shadow-sm backdrop-blur-md">
@@ -704,7 +896,212 @@ export default function DashboardPage() {
           <RecommendationsPanel recommendations={recommendations} />
         </section>
 
-        {/* 4. Category Breakdown & Capital Reserves */}
+        {/* ================= 4. UPCOMING COMMITMENTS (RECURRING EXPENSES) ================= */}
+        <section className="mt-8">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-800 shadow-sm">
+                  <Repeat className="h-4 w-4" />
+                </div>
+                <h2 className="text-xl font-black tracking-tight text-neutral-950">
+                  Upcoming commitments
+                </h2>
+              </div>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                Recurring bills and fixed monthly payments to keep in mind.
+              </p>
+            </div>
+
+            <Link
+              href="/recurring"
+              className="flex items-center gap-1.5 text-xs font-extrabold text-[#1f5c4a] transition hover:text-[#173d32] hover:translate-x-0.5"
+            >
+              View all
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Card 1: Monthly Total */}
+            <div className="overflow-hidden rounded-[28px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-5 shadow-[0_15px_35px_-10px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                  Monthly commitments
+                </p>
+                <div className="rounded-xl bg-cyan-500/15 p-2 text-cyan-700">
+                  <Receipt size={16} />
+                </div>
+              </div>
+              <p className="mt-3 text-2xl font-black text-neutral-950">
+                {profile.currency === "INR" ? "₹" : "AED "}
+                {Math.round(recurringMonthlyCommitment).toLocaleString(
+                  profile.currency === "INR" ? "en-IN" : "en-AE"
+                )}
+              </p>
+              <p className="mt-1.5 text-[11px] font-semibold text-neutral-500">
+                Based on active recurring payments
+              </p>
+            </div>
+
+            {/* Card 2: Active Reminders */}
+            <div className="overflow-hidden rounded-[28px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-5 shadow-[0_15px_35px_-10px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                  Active reminders
+                </p>
+                <div className="rounded-xl bg-emerald-500/15 p-2 text-emerald-700">
+                  <Repeat size={16} />
+                </div>
+              </div>
+              <p className="mt-3 text-2xl font-black text-neutral-950">
+                {activeRecurringExpenses.length}
+              </p>
+              <p className="mt-1.5 text-[11px] font-semibold text-neutral-500">
+                Recurring payments being tracked
+              </p>
+            </div>
+
+            {/* Card 3: Overdue / Need Attention */}
+            <div
+              className={`overflow-hidden rounded-[28px] border p-5 backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl sm:col-span-2 lg:col-span-1 ${
+                overdueRecurringExpenses.length > 0
+                  ? "border-red-300/80 bg-gradient-to-br from-red-50/70 to-red-100/50 shadow-[0_15px_35px_-10px_rgba(239,68,68,0.15),inset_0_1px_1px_rgba(255,255,255,0.9)]"
+                  : "border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 shadow-[0_15px_35px_-10px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.85)]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                  Need attention
+                </p>
+                <div
+                  className={`rounded-xl p-2 ${
+                    overdueRecurringExpenses.length > 0
+                      ? "bg-red-500/15 text-red-600"
+                      : "bg-teal-500/15 text-teal-700"
+                  }`}
+                >
+                  <AlertCircle size={16} />
+                </div>
+              </div>
+              <p
+                className={`mt-3 text-2xl font-black ${
+                  overdueRecurringExpenses.length > 0
+                    ? "text-red-600"
+                    : "text-neutral-950"
+                }`}
+              >
+                {overdueRecurringExpenses.length}
+              </p>
+              <p className="mt-1.5 text-[11px] font-semibold text-neutral-500">
+                {overdueRecurringExpenses.length > 0
+                  ? "Payments currently marked overdue"
+                  : "All recurring commitments up to date"}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= 5. YOUR GOALS (APPLE LIQUID GLASS) ================= */}
+        <section className="mt-8">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-teal-500/15 text-teal-800 shadow-sm">
+                  <Flag className="h-4 w-4" />
+                </div>
+                <h2 className="text-xl font-black tracking-tight text-neutral-950">
+                  Your goals
+                </h2>
+              </div>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                Keep track of what you're saving towards.
+              </p>
+            </div>
+
+            <Link
+              href="/goals"
+              className="flex items-center gap-1.5 text-xs font-extrabold text-[#1f5c4a] transition hover:text-[#173d32] hover:translate-x-0.5"
+            >
+              View all
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {goals.length === 0 ? (
+            <div className="overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl">
+              <p className="text-sm font-black text-neutral-900">
+                Create your first financial goal
+              </p>
+              <p className="mt-1 text-xs text-neutral-500 leading-relaxed">
+                Set a target for something important and track your progress over time.
+              </p>
+
+              <Link
+                href="/goals/create"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-2xl bg-[#173d32] px-5 py-2.5 text-xs font-bold text-white shadow-[0_12px_28px_rgba(23,61,50,0.25)] transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95"
+              >
+                <Plus size={14} />
+                Create goal
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {goals.slice(0, 2).map((goal) => {
+                const progress = getGoalProgress(goal);
+
+                return (
+                  <Link
+                    key={goal.id}
+                    href="/goals"
+                    className="group overflow-hidden rounded-[28px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-5 shadow-[0_15px_35px_-10px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-black text-neutral-900 group-hover:text-emerald-900 transition">
+                          {goal.name}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-neutral-500">
+                          {(goal as any).category || (goal as any).type || "General Goal"}
+                        </p>
+                      </div>
+
+                      <span className="rounded-xl border border-white/90 bg-white/80 px-2.5 py-1 text-xs font-black text-emerald-900 shadow-xs">
+                        {Math.round(progress)}%
+                      </span>
+                    </div>
+
+                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full border border-white/80 bg-neutral-200/60 p-0.5 shadow-inner">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700 shadow-sm"
+                        style={{
+                          width: `${Math.min(Math.max(progress, 0), 100)}%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-3 flex justify-between text-xs font-bold text-neutral-600">
+                      <span>
+                        {profile.currency === "INR" ? "₹" : "AED "}
+                        {Number(goal.currentAmount || 0).toLocaleString(
+                          profile.currency === "INR" ? "en-IN" : "en-AE"
+                        )}
+                      </span>
+                      <span className="text-neutral-400">
+                        Target: {profile.currency === "INR" ? "₹" : "AED "}
+                        {Number(goal.targetAmount || 0).toLocaleString(
+                          profile.currency === "INR" ? "en-IN" : "en-AE"
+                        )}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* 6. Category Breakdown & Capital Reserves */}
         <section className="mt-8 grid gap-7 lg:grid-cols-[1.3fr_1fr]">
           <div className="rounded-[36px] border border-white/80 bg-white/55 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl">
             <CategoryBreakdown
@@ -818,7 +1215,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 5. Automated Guidance Section */}
+        {/* 7. Guidance Section */}
         <section className="mt-10">
           <div className="mb-5">
             <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
@@ -848,8 +1245,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 6. Quick Launch Cards */}
-        <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {/* 8. Quick Launch Cards */}
+        <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div
             onClick={() => router.push("/expenses")}
             className="group cursor-pointer rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1.5 hover:border-emerald-300 hover:shadow-xl"
@@ -867,7 +1264,7 @@ export default function DashboardPage() {
               Log Real Expenses
             </h3>
             <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-              Record everyday spending manually or via import to automatically keep your category allocation and runway up to date.
+              Record everyday spending manually or via import to update category allocations.
             </p>
           </div>
 
@@ -888,17 +1285,17 @@ export default function DashboardPage() {
               Monthly Budget
             </h3>
             <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-              Set proactive category limits, track spending progress across the month, and prevent unexpected end-of-month deficits.
+              Set proactive category limits and prevent unexpected end-of-month deficits.
             </p>
           </div>
 
           <div
-            onClick={() => router.push("/setup")}
-            className="group cursor-pointer rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1.5 hover:border-teal-300 hover:shadow-xl sm:col-span-2 lg:col-span-1"
+            onClick={() => router.push("/goals")}
+            className="group cursor-pointer rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1.5 hover:border-teal-300 hover:shadow-xl"
           >
             <div className="flex items-center justify-between">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-500/15 text-teal-700 shadow-sm transition group-hover:scale-110">
-                <Settings size={22} />
+                <Flag size={22} />
               </div>
               <ArrowUpRight
                 size={18}
@@ -906,10 +1303,31 @@ export default function DashboardPage() {
               />
             </div>
             <h3 className="mt-5 text-lg font-bold text-neutral-900">
-              Calibrate Setup Parameters
+              Financial Goals
             </h3>
             <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-              Adjust baseline income, fixed utilities, monthly loan EMIs, or update your country currency configurations anytime.
+              Monitor savings milestones, deadlines, and trajectory progress across active goals.
+            </p>
+          </div>
+
+          <div
+            onClick={() => router.push("/recurring")}
+            className="group cursor-pointer rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1.5 hover:border-cyan-300 hover:shadow-xl"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700 shadow-sm transition group-hover:scale-110">
+                <Repeat size={22} />
+              </div>
+              <ArrowUpRight
+                size={18}
+                className="text-neutral-400 transition group-hover:text-cyan-700"
+              />
+            </div>
+            <h3 className="mt-5 text-lg font-bold text-neutral-900">
+              Commitments
+            </h3>
+            <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
+              Track subscriptions, utilities, and debt payments due every cycle.
             </p>
           </div>
         </section>
