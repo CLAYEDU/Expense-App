@@ -43,6 +43,7 @@ export interface RecurringExpense {
   category?: RecurringType | string;
   type?: RecurringType | string; // Alias for category
   dueDay: number; // Day of the month (1 - 31)
+  startDate?: string;
   active: boolean;
   currency?: "INR" | "AED" | string;
   note?: string;

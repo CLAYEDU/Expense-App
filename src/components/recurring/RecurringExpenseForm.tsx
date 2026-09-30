@@ -1,19 +1,7 @@
 "use client";
 
-import {
-  FormEvent,
-  useState,
-} from "react";
-
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-import {
-  ArrowLeft,
-  Loader2,
-  Save,
-} from "lucide-react";
-
 import { useAuth } from "@/components/auth-provider";
 
 import {
@@ -25,13 +13,22 @@ import {
   type RecurringType,
 } from "@/lib/recurring-expenses";
 
+import { Check, Loader2 } from "lucide-react";
+
 type Props = {
   mode: "create" | "edit";
   recurring?: RecurringExpense;
-  currency: "INR" | "AED";
+  currency?: "INR" | "AED";
 };
 
-const recurringTypes: RecurringType[] = [
+const FREQUENCIES: RecurringFrequency[] = [
+  "Monthly",
+  "Yearly",
+  "Weekly",
+  "Biweekly",
+];
+
+const CATEGORIES: RecurringType[] = [
   "Rent",
   "EMI",
   "Electricity",
@@ -42,454 +39,259 @@ const recurringTypes: RecurringType[] = [
   "Other",
 ];
 
-const frequencies: RecurringFrequency[] = [
-  "Monthly",
-  "Yearly",
-];
-
 export default function RecurringExpenseForm({
   mode,
   recurring,
-  currency,
+  currency = "INR",
 }: Props) {
   const router = useRouter();
-
   const { user } = useAuth();
 
-  const [name, setName] =
-    useState(
-      recurring?.name || ""
-    );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [type, setType] =
-    useState<RecurringType>(
-      recurring?.type || "Other"
-    );
+  const [name, setName] = useState(recurring?.name || "");
+  const [amount, setAmount] = useState(recurring ? String(recurring.amount) : "");
 
-  const [amount, setAmount] =
-    useState(
-      recurring?.amount?.toString() ||
-        ""
-    );
+  // Cast initial value safely to RecurringType
+  const [type, setType] = useState<RecurringType>(
+    (recurring?.category as RecurringType) ||
+      ((recurring as any)?.type as RecurringType) ||
+      "Subscription"
+  );
 
-  const [frequency, setFrequency] =
-    useState<RecurringFrequency>(
-      recurring?.frequency ||
-        "Monthly"
-    );
+  // Cast initial value safely to RecurringFrequency
+  const [frequency, setFrequency] = useState<RecurringFrequency>(
+    (recurring?.frequency as RecurringFrequency) || "Monthly"
+  );
 
-  const [dueDay, setDueDay] =
-    useState(
-      recurring?.dueDay?.toString() ||
-        "1"
-    );
+  const [dueDay, setDueDay] = useState(recurring ? String(recurring.dueDay) : "1");
+  const [startDate, setStartDate] = useState(
+    (recurring as any)?.startDate || new Date().toISOString().split("T")[0]
+  );
+  const [note, setNote] = useState((recurring as any)?.note || "");
+  const [active, setActive] = useState(recurring?.active ?? true);
 
-  const [startDate, setStartDate] =
-    useState(
-      recurring?.startDate ||
-        new Date()
-          .toISOString()
-          .split("T")[0]
-    );
-
-  const [active, setActive] =
-    useState(
-      recurring?.active ?? true
-    );
-
-  const [note, setNote] =
-    useState(
-      recurring?.note || ""
-    );
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault();
-
-    if (!user) {
-      setError(
-        "Please sign in again before continuing."
-      );
-      return;
-    }
-
-    setError("");
-
-    const numericAmount =
-      Number(amount);
-
-    const numericDueDay =
-      Number(dueDay);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user) return;
 
     if (!name.trim()) {
-      setError(
-        "Please enter a name."
-      );
+      setError("Please provide a name for this recurring expense.");
       return;
     }
 
-    if (
-      !Number.isFinite(
-        numericAmount
-      ) ||
-      numericAmount <= 0
-    ) {
-      setError(
-        "Amount must be greater than zero."
-      );
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setError("Please enter a valid amount greater than 0.");
       return;
     }
 
-    if (
-      !Number.isInteger(
-        numericDueDay
-      ) ||
-      numericDueDay < 1 ||
-      numericDueDay > 31
-    ) {
-      setError(
-        "Due day must be between 1 and 31."
-      );
+    const numDueDay = parseInt(dueDay, 10);
+    if (isNaN(numDueDay) || numDueDay < 1 || numDueDay > 31) {
+      setError("Due day must be between 1 and 31.");
       return;
     }
-
-    if (!startDate) {
-      setError(
-        "Please select a start date."
-      );
-      return;
-    }
-
-    const input: RecurringExpenseInput =
-      {
-        name: name.trim(),
-        type,
-        amount: numericAmount,
-        currency,
-        frequency,
-        dueDay: numericDueDay,
-        startDate,
-        active,
-        note:
-          note.trim() || undefined,
-      };
 
     try {
-      setSaving(true);
+      setLoading(true);
+      setError(null);
 
-      if (
-        mode === "edit" &&
-        recurring
-      ) {
-        await updateRecurringExpense(
-          user.uid,
-          recurring.id,
-          input
-        );
-      } else {
-        await addRecurringExpense(
-          user.uid,
-          input
-        );
+      const payload: RecurringExpenseInput = {
+        name: name.trim(),
+        amount: numAmount,
+        category: type,
+        type: type,
+        frequency,
+        dueDay: numDueDay,
+        startDate,
+        note: note.trim() || undefined,
+        active,
+        currency,
+      };
+
+      if (mode === "create") {
+        await addRecurringExpense(user.uid, payload);
+      } else if (mode === "edit" && recurring) {
+        await updateRecurringExpense(user.uid, recurring.id, payload);
       }
 
-      router.push(
-        "/recurring"
-      );
-
+      router.push("/recurring");
       router.refresh();
-    } catch (error) {
-      console.error(
-        "Failed to save recurring expense:",
-        error
-      );
-
-      setError(
-        "Something went wrong while saving this recurring expense."
-      );
+    } catch (err: any) {
+      console.error("Error saving recurring expense:", err);
+      setError(err?.message || "Failed to save recurring expense.");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <Link
-        href="/recurring"
-        className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-neutral-600 transition hover:text-neutral-950"
-      >
-        <ArrowLeft className="h-4 w-4" />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="rounded-2xl border border-red-300/80 bg-red-50/90 p-4 text-xs font-bold text-red-800 shadow-sm backdrop-blur-md">
+          {error}
+        </div>
+      )}
 
-        Back to recurring expenses
-      </Link>
-
-      <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-950">
-          {mode === "edit"
-            ? "Edit recurring expense"
-            : "Add recurring expense"}
-        </h1>
-
-        <p className="mt-2 text-sm leading-6 text-neutral-500">
-          Add bills, rent, EMIs or subscriptions
-          that repeat on a regular schedule.
-        </p>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-8 space-y-6"
-        >
-          <div>
-            <label
-              htmlFor="recurring-name"
-              className="mb-2 block text-sm font-medium text-neutral-800"
-            >
-              Name
-            </label>
-
-            <input
-              id="recurring-name"
-              value={name}
-              onChange={(event) =>
-                setName(
-                  event.target.value
-                )
-              }
-              placeholder="e.g. Home Rent"
-              className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm outline-none transition focus:border-neutral-500 focus:bg-white"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="recurring-type"
-              className="mb-2 block text-sm font-medium text-neutral-800"
-            >
-              Type
-            </label>
-
-            <select
-              id="recurring-type"
-              value={type}
-              onChange={(event) =>
-                setType(
-                  event.target
-                    .value as RecurringType
-                )
-              }
-              className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm outline-none transition focus:border-neutral-500 focus:bg-white"
-            >
-              {recurringTypes.map(
-                (item) => (
-                  <option
-                    key={item}
-                    value={item}
-                  >
-                    {item}
-                  </option>
-                )
-              )}
-            </select>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="recurring-amount"
-                className="mb-2 block text-sm font-medium text-neutral-800"
-              >
-                Amount (
-                {currency === "INR"
-                  ? "₹"
-                  : "AED"}
-                )
-              </label>
-
-              <input
-                id="recurring-amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={amount}
-                onChange={(event) =>
-                  setAmount(
-                    event.target.value
-                  )
-                }
-                placeholder="5000"
-                className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm outline-none transition focus:border-neutral-500 focus:bg-white"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="recurring-frequency"
-                className="mb-2 block text-sm font-medium text-neutral-800"
-              >
-                Frequency
-              </label>
-
-              <select
-                id="recurring-frequency"
-                value={frequency}
-                onChange={(event) =>
-                  setFrequency(
-                    event.target
-                      .value as RecurringFrequency
-                  )
-                }
-                className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm outline-none transition focus:border-neutral-500 focus:bg-white"
-              >
-                {frequencies.map(
-                  (item) => (
-                    <option
-                      key={item}
-                      value={item}
-                    >
-                      {item}
-                    </option>
-                  )
-                )}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="recurring-due-day"
-                className="mb-2 block text-sm font-medium text-neutral-800"
-              >
-                Due day
-              </label>
-
-              <input
-                id="recurring-due-day"
-                type="number"
-                min="1"
-                max="31"
-                value={dueDay}
-                onChange={(event) =>
-                  setDueDay(
-                    event.target.value
-                  )
-                }
-                className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm outline-none transition focus:border-neutral-500 focus:bg-white"
-              />
-
-              <p className="mt-1.5 text-xs text-neutral-500">
-                For example, enter 5 for the 5th
-                of each month.
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="recurring-start-date"
-                className="mb-2 block text-sm font-medium text-neutral-800"
-              >
-                Start date
-              </label>
-
-              <input
-                id="recurring-start-date"
-                type="date"
-                value={startDate}
-                onChange={(event) =>
-                  setStartDate(
-                    event.target.value
-                  )
-                }
-                className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm outline-none transition focus:border-neutral-500 focus:bg-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="recurring-note"
-              className="mb-2 block text-sm font-medium text-neutral-800"
-            >
-              Note
-              <span className="ml-1 font-normal text-neutral-400">
-                optional
-              </span>
-            </label>
-
-            <textarea
-              id="recurring-note"
-              rows={3}
-              value={note}
-              onChange={(event) =>
-                setNote(
-                  event.target.value
-                )
-              }
-              placeholder="Add account details, reminder notes, etc."
-              className="w-full resize-none rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm outline-none transition focus:border-neutral-500 focus:bg-white"
-            />
-          </div>
-
-          <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-            <div>
-              <p className="text-sm font-medium text-neutral-900">
-                Active reminder
-              </p>
-
-              <p className="mt-1 text-xs text-neutral-500">
-                Disable this when the recurring payment
-                is no longer active.
-              </p>
-            </div>
-
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(event) =>
-                setActive(
-                  event.target.checked
-                )
-              }
-              className="h-5 w-5 rounded border-neutral-300"
-            />
-          </label>
-
-          {error && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-
-                {mode === "edit"
-                  ? "Save changes"
-                  : "Add recurring expense"}
-              </>
-            )}
-          </button>
-        </form>
+      {/* Name */}
+      <div>
+        <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">
+          Commitment Title
+        </label>
+        <input
+          type="text"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Netflix, Apartment Rent, Car Loan"
+          className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm backdrop-blur-md outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+        />
       </div>
-    </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        {/* Amount */}
+        <div>
+          <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">
+            Amount ({currency})
+          </label>
+          <input
+            type="number"
+            step="any"
+            required
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm backdrop-blur-md outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
+
+        {/* Due Day */}
+        <div>
+          <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">
+            Billing Day of Month (1 - 31)
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="31"
+            required
+            value={dueDay}
+            onChange={(e) => setDueDay(e.target.value)}
+            className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm backdrop-blur-md outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        {/* Category / Type */}
+        <div>
+          <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">
+            Category
+          </label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as RecurringType)}
+            className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm backdrop-blur-md outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+          >
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Frequency */}
+        <div>
+          <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">
+            Frequency
+          </label>
+          <select
+            value={frequency}
+            onChange={(e) => setFrequency(e.target.value as RecurringFrequency)}
+            className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm backdrop-blur-md outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+          >
+            {FREQUENCIES.map((freq) => (
+              <option key={freq} value={freq}>
+                {freq}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        {/* Start Date */}
+        <div>
+          <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">
+            First Billing / Start Date
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm backdrop-blur-md outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
+
+        {/* Active Toggle */}
+        <div className="flex items-center gap-3 pt-6">
+          <input
+            type="checkbox"
+            id="active-toggle"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+            className="h-5 w-5 rounded-lg border-neutral-300 text-emerald-600 focus:ring-emerald-500"
+          />
+          <label htmlFor="active-toggle" className="text-xs font-bold text-neutral-800 cursor-pointer">
+            Commitment is currently active
+          </label>
+        </div>
+      </div>
+
+      {/* Note / Memo */}
+      <div>
+        <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">
+          Note / Memo (Optional)
+        </label>
+        <textarea
+          rows={2}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. Account number, contract renewal date"
+          className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm backdrop-blur-md outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+        />
+      </div>
+
+      {/* Submit Buttons */}
+      <div className="flex items-center justify-end gap-3 pt-4">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="rounded-2xl border border-white/90 bg-white/70 px-5 py-3 text-xs font-bold text-neutral-700 shadow-sm backdrop-blur-md transition hover:bg-white active:scale-95"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-2xl bg-[#173d32] px-6 py-3 text-xs font-bold text-white shadow-lg shadow-[#173d32]/25 transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>Saving...</span>
+            </>
+          ) : (
+            <>
+              <Check size={16} />
+              <span>{mode === "create" ? "Create Commitment" : "Update Commitment"}</span>
+            </>
+          )}
+        </button>
+      </div>
+    </form>
   );
 }
