@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import FinancialInsightsLoader from "@/components/financial/FinancialInsightsLoader";
 
 import { useAuth } from "@/components/auth-provider";
 import { getFinancialProfile } from "@/lib/financial-profile";
@@ -39,7 +40,6 @@ import {
   PiggyBank,
   Plus,
   Receipt,
-  Settings,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -53,6 +53,7 @@ import {
   Flag,
   Repeat,
   AlertCircle,
+  FileText,
   X,
 } from "lucide-react";
 import { logoutUser } from "@/lib/auth";
@@ -527,6 +528,15 @@ export default function DashboardPage() {
             {/* ================= LAPTOP VIEW (lg:flex) ================= */}
             <div className="hidden lg:flex items-center gap-2">
               <Link
+                href="/reports"
+                aria-label="Monthly Reports"
+                className="flex items-center gap-1.5 rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
+              >
+                <FileText size={15} className="text-emerald-700" />
+                <span>Reports</span>
+              </Link>
+
+              <Link
                 href="/goals"
                 aria-label="Goals"
                 className="flex items-center gap-1.5 rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
@@ -664,6 +674,22 @@ export default function DashboardPage() {
                       <div>
                         <p className="text-xs font-black text-neutral-900">Commitments</p>
                         <p className="text-[10px] font-semibold text-neutral-500">Recurring bills & EMIs</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMobileActionMenu(false);
+                        router.push("/reports");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition hover:bg-white/80 active:scale-98"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-800 shadow-sm">
+                        <FileText size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-neutral-900">Monthly Reports</p>
+                        <p className="text-[10px] font-semibold text-neutral-500">Performance summaries & CSV</p>
                       </div>
                     </button>
                   </div>
@@ -891,8 +917,31 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 3. Actionable Insights Panel */}
-        <section className="mt-8">
+        {/* ================= 3. ACTIONABLE INSIGHTS & AI ENGINE ================= */}
+        <section className="mt-8 space-y-6">
+          <div className="overflow-hidden rounded-[36px] border border-white/80 bg-white/50 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
+            <FinancialInsightsLoader
+              uid={user.uid}
+              profile={{
+                ...profile,
+                otherFixedExpenses:
+                  (profile as any).otherFixedExpenses ??
+                  (profile as any).recurringExpenses ??
+                  0,
+                emiAmount:
+                  (profile as any).emiAmount ??
+                  (profile as any).monthlyEmi ??
+                  (profile as any).emi ??
+                  0,
+                currentInvestments:
+                  (profile as any).currentInvestments ??
+                  (profile as any).monthlyInvestments ??
+                  0,
+              } as any}
+              limit={6}
+            />
+          </div>
+
           <RecommendationsPanel recommendations={recommendations} />
         </section>
 
@@ -1246,7 +1295,7 @@ export default function DashboardPage() {
         </section>
 
         {/* 8. Quick Launch Cards */}
-        <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <div
             onClick={() => router.push("/expenses")}
             className="group cursor-pointer rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1.5 hover:border-emerald-300 hover:shadow-xl"
@@ -1260,11 +1309,11 @@ export default function DashboardPage() {
                 className="text-neutral-400 transition group-hover:text-emerald-700"
               />
             </div>
-            <h3 className="mt-5 text-lg font-bold text-neutral-900">
+            <h3 className="mt-5 text-base font-bold text-neutral-900">
               Log Real Expenses
             </h3>
             <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-              Record everyday spending manually or via import to update category allocations.
+              Record everyday spending manually or via import.
             </p>
           </div>
 
@@ -1281,11 +1330,11 @@ export default function DashboardPage() {
                 className="text-neutral-400 transition group-hover:text-amber-700"
               />
             </div>
-            <h3 className="mt-5 text-lg font-bold text-neutral-900">
+            <h3 className="mt-5 text-base font-bold text-neutral-900">
               Monthly Budget
             </h3>
             <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-              Set proactive category limits and prevent unexpected end-of-month deficits.
+              Set proactive limits to prevent end-of-month deficits.
             </p>
           </div>
 
@@ -1302,11 +1351,11 @@ export default function DashboardPage() {
                 className="text-neutral-400 transition group-hover:text-teal-700"
               />
             </div>
-            <h3 className="mt-5 text-lg font-bold text-neutral-900">
+            <h3 className="mt-5 text-base font-bold text-neutral-900">
               Financial Goals
             </h3>
             <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-              Monitor savings milestones, deadlines, and trajectory progress across active goals.
+              Track progress across targets and deadlines.
             </p>
           </div>
 
@@ -1323,11 +1372,32 @@ export default function DashboardPage() {
                 className="text-neutral-400 transition group-hover:text-cyan-700"
               />
             </div>
-            <h3 className="mt-5 text-lg font-bold text-neutral-900">
+            <h3 className="mt-5 text-base font-bold text-neutral-900">
               Commitments
             </h3>
             <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
-              Track subscriptions, utilities, and debt payments due every cycle.
+              Manage subscriptions, utility bills, and loan EMIs.
+            </p>
+          </div>
+
+          <div
+            onClick={() => router.push("/reports")}
+            className="group cursor-pointer rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1.5 hover:border-emerald-300 hover:shadow-xl sm:col-span-2 lg:col-span-1"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-700 shadow-sm transition group-hover:scale-110">
+                <FileText size={22} />
+              </div>
+              <ArrowUpRight
+                size={18}
+                className="text-neutral-400 transition group-hover:text-emerald-700"
+              />
+            </div>
+            <h3 className="mt-5 text-base font-bold text-neutral-900">
+              Monthly Reports
+            </h3>
+            <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
+              Review monthly performance statements and export CSV data.
             </p>
           </div>
         </section>

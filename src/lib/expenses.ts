@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+
 export type ExpenseCategory =
   | "Food & Groceries"
   | "Housing"
@@ -24,6 +25,7 @@ export type ExpenseCategory =
   | "Family"
   | "Travel"
   | "Other";
+
 
 export type PaymentMethod =
   | "Cash"

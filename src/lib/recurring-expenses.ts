@@ -1,14 +1,22 @@
 import {
-  addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
-  serverTimestamp,
+  setDoc,
   updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  serverTimestamp,
 } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type { ExpenseCategory } from "@/lib/expenses";
 
-import { db } from "./firebase";
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
+
+export type RecurringFrequency = "Monthly" | "Yearly" | "Weekly" | "Biweekly";
 
 export type RecurringType =
   | "Rent"
@@ -20,458 +28,244 @@ export type RecurringType =
   | "Education"
   | "Other";
 
-export type RecurringFrequency =
-  | "Monthly"
-  | "Yearly";
+export type RecurringStatus =
+  | "paid"
+  | "due_soon"
+  | "overdue"
+  | "upcoming"
+  | "inactive";
 
-export type RecurringExpense = {
+export interface RecurringExpense {
   id: string;
-  uid: string;
-
   name: string;
-  type: RecurringType;
-
   amount: number;
-  currency: "INR" | "AED";
-
-  frequency: RecurringFrequency;
-
-  dueDay: number;
-
-  startDate: string;
-
+  frequency: RecurringFrequency | string;
+  category?: RecurringType | string;
+  type?: RecurringType | string; // Alias for category
+  dueDay: number; // Day of the month (1 - 31)
   active: boolean;
-
-  /**
-   * Stores the occurrence key that has been marked paid.
-   * Example:
-   * 2026-09
-   * 2026
-   */
-  lastPaidPeriod?: string;
-
+  currency?: "INR" | "AED" | string;
   note?: string;
-
+  lastPaidPeriod?: string; // e.g. "2026-09" or "2026"
   createdAt?: unknown;
   updatedAt?: unknown;
+}
+
+// Exported input type expected by RecurringExpenseForm
+export type RecurringExpenseInput = Omit<RecurringExpense, "id"> & {
+  id?: string;
 };
 
-export type RecurringExpenseInput = {
-  name: string;
-  type: RecurringType;
-  amount: number;
-  currency: "INR" | "AED";
-  frequency: RecurringFrequency;
-  dueDay: number;
-  startDate: string;
-  active: boolean;
-  note?: string;
-  lastPaidPeriod?: string;
-};
+// ============================================================================
+// DATE & PERIOD HELPERS
+// ============================================================================
 
-function recurringCollection(uid: string) {
-  return collection(
-    db,
-    "users",
-    uid,
-    "recurringExpenses"
-  );
+export function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
 }
 
-export async function getRecurringExpenses(
-  uid: string
-): Promise<RecurringExpense[]> {
-  const snapshot = await getDocs(
-    recurringCollection(uid)
-  );
-
-  return snapshot.docs
-    .map((item) => ({
-      id: item.id,
-      ...(item.data() as Omit<
-        RecurringExpense,
-        "id"
-      >),
-    }))
-    .sort((a, b) => {
-      return a.dueDay - b.dueDay;
-    });
+export function getMonthlyPeriodKey(date: Date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export async function addRecurringExpense(
-  uid: string,
-  input: RecurringExpenseInput
-) {
-  const reference = await addDoc(
-    recurringCollection(uid),
-    {
-      ...input,
-      uid,
-      amount: Number(input.amount),
-      dueDay: Number(input.dueDay),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }
-  );
-
-  return reference.id;
-}
-
-export async function updateRecurringExpense(
-  uid: string,
-  recurringId: string,
-  input: Partial<RecurringExpenseInput>
-) {
-  const reference = doc(
-    db,
-    "users",
-    uid,
-    "recurringExpenses",
-    recurringId
-  );
-
-  const updates: Record<string, unknown> = {
-    ...input,
-    updatedAt: serverTimestamp(),
-  };
-
-  if (input.amount !== undefined) {
-    updates.amount = Number(
-      input.amount
-    );
-  }
-
-  if (input.dueDay !== undefined) {
-    updates.dueDay = Number(
-      input.dueDay
-    );
-  }
-
-  await updateDoc(
-    reference,
-    updates
-  );
-}
-
-export async function deleteRecurringExpense(
-  uid: string,
-  recurringId: string
-) {
-  const reference = doc(
-    db,
-    "users",
-    uid,
-    "recurringExpenses",
-    recurringId
-  );
-
-  await deleteDoc(reference);
-}
-
-function pad(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-export function getMonthlyPeriodKey(
-  date = new Date()
-) {
-  return `${date.getFullYear()}-${pad(
-    date.getMonth() + 1
-  )}`;
-}
-
-export function getYearlyPeriodKey(
-  date = new Date()
-) {
+export function getYearlyPeriodKey(date: Date = new Date()): string {
   return String(date.getFullYear());
 }
 
-export function getPeriodKey(
-  recurring: RecurringExpense,
-  date = new Date()
-) {
+export function getRecurringPaymentPeriod(recurring: RecurringExpense): string {
+  const date = new Date();
   if (recurring.frequency === "Yearly") {
     return getYearlyPeriodKey(date);
   }
-
   return getMonthlyPeriodKey(date);
 }
 
-export function isPaidForCurrentPeriod(
-  recurring: RecurringExpense,
-  date = new Date()
-) {
-  return (
-    recurring.lastPaidPeriod ===
-    getPeriodKey(recurring, date)
-  );
+export function getRecurringPeriodLabel(recurring: RecurringExpense): string {
+  return getRecurringPaymentPeriod(recurring);
 }
 
-export function getDaysInMonth(
-  year: number,
-  month: number
-) {
-  return new Date(
-    year,
-    month + 1,
-    0
-  ).getDate();
-}
+export function getRecurringExpenseDate(recurring: RecurringExpense): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
 
-export function getNextDueDate(
-  recurring: RecurringExpense,
-  fromDate = new Date()
-) {
-  const start = new Date(
-    `${recurring.startDate}T00:00:00`
+  const safeDay = Math.min(
+    Math.max(1, recurring.dueDay || 1),
+    getDaysInMonth(year, month)
   );
 
-  if (
-    Number.isNaN(start.getTime())
-  ) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+export function getRecurringExpenseCategory(
+  type: RecurringType | string
+): ExpenseCategory {
+  switch (type) {
+    case "Rent":
+      return "Housing";
+    case "EMI":
+      return "EMI / Debt";
+    case "Electricity":
+    case "Internet / Mobile":
+      return "Electricity & Utilities";
+    case "Subscription":
+      return "Entertainment";
+    case "Education":
+      return "Education";
+    case "Insurance":
+    default:
+      return "Other";
+  }
+}
+
+// ============================================================================
+// STATUS & DUE DATE LOGIC
+// ============================================================================
+
+export function getDaysUntilDue(recurring: RecurringExpense): number | null {
+  if (!recurring.active) return null;
+
+  const currentPeriod = getRecurringPaymentPeriod(recurring);
+  if (recurring.lastPaidPeriod === currentPeriod) {
     return null;
   }
 
-  let year =
-    fromDate.getFullYear();
+  const today = new Date();
+  const currentDay = today.getDate();
+  const dueDay = recurring.dueDay || 1;
 
-  let month =
-    fromDate.getMonth();
-
-  if (recurring.frequency === "Yearly") {
-    let targetYear = year;
-
-    if (
-      month > start.getMonth() ||
-      (month === start.getMonth() &&
-        fromDate.getDate() >
-          recurring.dueDay)
-    ) {
-      targetYear += 1;
-    }
-
-    const maxDay =
-      getDaysInMonth(
-        targetYear,
-        start.getMonth()
-      );
-
-    const day = Math.min(
-      recurring.dueDay,
-      maxDay
-    );
-
-    return new Date(
-      targetYear,
-      start.getMonth(),
-      day
-    );
-  }
-
-  let targetMonth = month;
-
-  const maxDayThisMonth =
-    getDaysInMonth(
-      year,
-      targetMonth
-    );
-
-  const targetDay = Math.min(
-    recurring.dueDay,
-    maxDayThisMonth
-  );
-
-  const candidate = new Date(
-    year,
-    targetMonth,
-    targetDay
-  );
-
-  if (candidate < fromDate) {
-    targetMonth += 1;
-
-    if (targetMonth > 11) {
-      targetMonth = 0;
-      year += 1;
-    }
-  }
-
-  const maxDay =
-    getDaysInMonth(
-      year,
-      targetMonth
-    );
-
-  return new Date(
-    year,
-    targetMonth,
-    Math.min(
-      recurring.dueDay,
-      maxDay
-    )
-  );
+  return dueDay - currentDay;
 }
 
-export function getRecurringStatus(
-  recurring: RecurringExpense,
-  today = new Date()
-) {
-  if (!recurring.active) {
-    return "inactive" as const;
+export function getRecurringStatus(recurring: RecurringExpense): RecurringStatus {
+  if (!recurring.active) return "inactive";
+
+  const currentPeriod = getRecurringPaymentPeriod(recurring);
+  if (recurring.lastPaidPeriod === currentPeriod) {
+    return "paid";
   }
 
-  if (
-    isPaidForCurrentPeriod(
-      recurring,
-      today
-    )
-  ) {
-    return "paid" as const;
+  const today = new Date();
+  const currentDay = today.getDate();
+  const dueDay = recurring.dueDay || 1;
+
+  if (currentDay > dueDay) {
+    return "overdue";
   }
 
-  const dueDate =
-    getCurrentDueDate(
-      recurring,
-      today
-    );
-
-  if (!dueDate) {
-    return "upcoming" as const;
+  if (dueDay - currentDay <= 7) {
+    return "due_soon";
   }
 
-  const difference =
-    differenceInCalendarDays(
-      dueDate,
-      today
-    );
-
-  if (difference < 0) {
-    return "overdue" as const;
-  }
-
-  if (difference <= 7) {
-    return "due-soon" as const;
-  }
-
-  return "upcoming" as const;
+  return "upcoming";
 }
 
-export function getCurrentDueDate(
-  recurring: RecurringExpense,
-  today = new Date()
-) {
-  const start = new Date(
-    `${recurring.startDate}T00:00:00`
-  );
-
-  if (
-    Number.isNaN(start.getTime())
-  ) {
-    return null;
-  }
-
-  let year =
-    today.getFullYear();
-
-  let month =
-    today.getMonth();
-
-  if (
-    recurring.frequency === "Yearly"
-  ) {
-    let targetYear = year;
-
-    if (
-      month < start.getMonth()
-    ) {
-      targetYear -= 1;
-    }
-
-    if (
-      month === start.getMonth() &&
-      today.getDate() <
-        recurring.dueDay
-    ) {
-      targetYear -= 1;
-    }
-
-    const day = Math.min(
-      recurring.dueDay,
-      getDaysInMonth(
-        targetYear,
-        start.getMonth()
-      )
-    );
-
-    return new Date(
-      targetYear,
-      start.getMonth(),
-      day
-    );
-  }
-
-  const day = Math.min(
-    recurring.dueDay,
-    getDaysInMonth(
-      year,
-      month
-    )
-  );
-
-  return new Date(
-    year,
-    month,
-    day
-  );
+export function isPaidForCurrentPeriod(recurring: RecurringExpense): boolean {
+  return getRecurringStatus(recurring) === "paid";
 }
 
-function differenceInCalendarDays(
-  dateA: Date,
-  dateB: Date
-) {
-  const a = new Date(dateA);
-  const b = new Date(dateB);
+// ============================================================================
+// FIRESTORE CRUD OPERATIONS
+// ============================================================================
 
-  a.setHours(0, 0, 0, 0);
-  b.setHours(0, 0, 0, 0);
-
-  const difference =
-    a.getTime() - b.getTime();
-
-  return Math.round(
-    difference /
-      (1000 * 60 * 60 * 24)
-  );
-}
-
-export function getDaysUntilDue(
-  recurring: RecurringExpense,
-  today = new Date()
-) {
-  const dueDate =
-    getCurrentDueDate(
-      recurring,
-      today
-    );
-
-  if (!dueDate) {
-    return null;
+export async function getRecurringExpenses(uid: string): Promise<RecurringExpense[]> {
+  const ref = collection(db, "users", uid, "recurringExpenses");
+  try {
+    const q = query(ref, orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<RecurringExpense, "id">),
+    }));
+  } catch {
+    const snap = await getDocs(ref);
+    return snap.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<RecurringExpense, "id">),
+    }));
   }
-
-  return differenceInCalendarDays(
-    dueDate,
-    today
-  );
 }
 
-export function getRecurringPeriodLabel(
+export async function saveRecurringExpense(
+  uid: string,
+  data: RecurringExpenseInput
+): Promise<string> {
+  const ref = collection(db, "users", uid, "recurringExpenses");
+  const docRef = data.id ? doc(ref, data.id) : doc(ref);
+
+  await setDoc(
+    docRef,
+    {
+      ...data,
+      amount: Number(data.amount) || 0,
+      dueDay: Number(data.dueDay) || 1,
+      active: data.active ?? true,
+      updatedAt: serverTimestamp(),
+      ...(data.id ? {} : { createdAt: serverTimestamp() }),
+    },
+    { merge: true }
+  );
+
+  return docRef.id;
+}
+
+// Alias to satisfy imports looking for `addRecurringExpense`
+export const addRecurringExpense = saveRecurringExpense;
+
+export async function updateRecurringExpense(
+  uid: string,
+  id: string,
+  updates: Partial<RecurringExpense>
+): Promise<void> {
+  const docRef = doc(db, "users", uid, "recurringExpenses", id);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteRecurringExpense(uid: string, id: string): Promise<void> {
+  const docRef = doc(db, "users", uid, "recurringExpenses", id);
+  await deleteDoc(docRef);
+}
+
+// ============================================================================
+// CONNECTED WORKFLOW: MARK AS PAID
+// ============================================================================
+
+export async function markRecurringAsPaid(
+  uid: string,
   recurring: RecurringExpense
-) {
-  if (
-    recurring.frequency === "Yearly"
-  ) {
-    return "year";
-  }
+): Promise<{ expenseId: string; period: string }> {
+  const period = getRecurringPaymentPeriod(recurring);
+  const expenseDate = getRecurringExpenseDate(recurring);
+  const mappedCategory = getRecurringExpenseCategory(
+    recurring.category || recurring.type || recurring.name
+  );
 
-  return "month";
+  const expenseDocRef = doc(collection(db, "users", uid, "expenses"));
+  const newExpense = {
+    id: expenseDocRef.id,
+    title: `${recurring.name} (${recurring.frequency || "Monthly"})`,
+    amount: Number(recurring.amount) || 0,
+    category: mappedCategory,
+    date: expenseDate,
+    paymentMethod: "Bank Transfer",
+    note: `Automated payment from recurring commitment [${recurring.name}] for ${period}`,
+    createdAt: serverTimestamp(),
+  };
+
+  await setDoc(expenseDocRef, newExpense);
+
+  const recurringDocRef = doc(db, "users", uid, "recurringExpenses", recurring.id);
+  await setDoc(
+    recurringDocRef,
+    {
+      lastPaidPeriod: period,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return { expenseId: expenseDocRef.id, period };
 }
