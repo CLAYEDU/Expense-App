@@ -12,7 +12,7 @@ export default function LoginPage() {
   // Mode: "login" or "register"
   const [mode, setMode] = useState<"login" | "register">("login");
 
-  // Track active flip direction independently so it never breaks mid-animation
+  // Track active flip direction independently
   const [flippingDirection, setFlippingDirection] = useState<"toRegister" | "toLogin" | null>(null);
 
   // Form Fields
@@ -36,13 +36,13 @@ export default function LoginPage() {
     const direction = targetMode === "register" ? "toRegister" : "toLogin";
     setFlippingDirection(direction);
 
-    // Swap the underneath content at 650ms (exact 90-degree perpendicular point)
+    // Swap content exactly at 90-degree perpendicular point (~375ms)
     setTimeout(() => {
       setMode(targetMode);
       window.history.replaceState(null, "", `/${targetMode}`);
-    }, 650);
+    }, 375);
 
-    // Finish full 180-degree landing before removing the overlay
+    // Complete the full 180-degree turn
     setTimeout(() => {
       setFlippingDirection(null);
     }, 750);
@@ -116,21 +116,23 @@ export default function LoginPage() {
   const isAnimating = flippingDirection !== null;
 
   return (
-    <main className="min-h-screen w-full bg-[#f7f6f2] px-4 py-8 sm:px-6 sm:py-10 md:h-screen md:overflow-hidden md:py-6 flex items-center justify-center">
-      {/* Outer Container: Auto-height & clean scrolling on mobile/tablet, exact 610px fixed 3D book spread on laptop/desktop */}
-      <div className="relative w-full max-w-md md:max-w-4xl min-h-[580px] md:h-[610px] overflow-hidden rounded-[28px] sm:rounded-[32px] border border-[#e7e5df] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.06)] md:shadow-[0_25px_70px_rgba(0,0,0,0.08)] md:[perspective:2600px]">
+    <main className="min-h-screen w-full bg-[#f7f6f2] px-4 py-6 sm:px-6 sm:py-8 md:h-screen md:overflow-hidden md:py-6 flex items-center justify-center">
+      {/* Outer Book Container: 
+          - Mobile/Tablet: Vertical orientation with perspective 
+          - Laptop/Desktop: Exact original horizontal book dimensions (h-[610px], max-w-4xl) */}
+      <div className="relative w-full max-w-md md:max-w-4xl min-h-[640px] md:h-[610px] overflow-hidden rounded-[32px] border border-[#e7e5df] bg-white shadow-[0_25px_70px_rgba(0,0,0,0.08)] [perspective:2600px]">
         
         {/* ================= BACKGROUND SPREAD ================= */}
         <div className="flex flex-col md:grid h-full w-full md:grid-cols-2">
           
-          {/* ================= LEFT COLUMN =================
-              - Desktop: Green Cover on Login / Register Form on Register
-              - Mobile/Tablet: Renders ONLY when in Register mode (so mobile users immediately see the Register form) */}
+          {/* PANEL 1: 
+              - Desktop Left / Mobile Top 
+              - Green Cover on Login / Register Form on Register */}
           <div
             className={`p-6 sm:p-8 lg:p-10 flex flex-col justify-between transition-colors duration-500 ${
               isRegister
-                ? "flex bg-[#fafaf8] text-neutral-800"
-                : "hidden md:flex bg-[#173d32] text-white border-r border-[#123027]"
+                ? "bg-[#fafaf8] text-neutral-800"
+                : "bg-[#173d32] text-white border-b md:border-b-0 md:border-r border-[#123027]"
             }`}
           >
             {isRegister ? (
@@ -252,50 +254,50 @@ export default function LoginPage() {
             ) : (
               <>
                 <div>
-                  <div className="mb-6 text-lg font-semibold tracking-tight">Finora</div>
-                  <h1 className="max-w-xs text-3xl font-medium leading-tight lg:text-4xl">
+                  <div className="mb-4 md:mb-6 text-lg font-semibold tracking-tight">Finora</div>
+                  <h1 className="max-w-xs text-2xl sm:text-3xl font-medium leading-tight lg:text-4xl">
                     Understand your money. Plan your future.
                   </h1>
-                  <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/70">
+                  <p className="mt-3 md:mt-4 max-w-xs text-xs sm:text-sm leading-relaxed text-white/70">
                     Track everyday expenses, understand your spending and build a financial plan around your actual situation.
                   </p>
                 </div>
-                <div className="flex items-center justify-between text-xs text-white/50">
+                <div className="mt-6 md:mt-0 flex items-center justify-between text-xs text-white/50">
                   <span>India • UAE</span>
                 </div>
               </>
             )}
           </div>
 
-          {/* ================= RIGHT COLUMN =================
-              - Desktop: Sign In Form on Login / Green Info Card on Register
-              - Mobile/Tablet: Renders ONLY when in Login mode (so mobile users immediately see the Login form) */}
+          {/* PANEL 2: 
+              - Desktop Right / Mobile Bottom 
+              - Sign In Form on Login / Green Info Card on Register */}
           <div
             className={`p-6 sm:p-8 lg:p-10 flex flex-col justify-between transition-colors duration-500 ${
               isRegister
-                ? "hidden md:flex bg-[#173d32] text-white border-l border-[#123027]"
-                : "flex bg-white text-neutral-800"
+                ? "bg-[#173d32] text-white border-t md:border-t-0 md:border-l border-[#123027]"
+                : "bg-white text-neutral-800"
             }`}
           >
             {isRegister ? (
               <>
                 <div>
-                  <div className="flex items-center gap-2 mb-6">
+                  <div className="flex items-center gap-2 mb-4 md:mb-6">
                     <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
                       <Sparkles size={16} />
                     </div>
                     <span className="text-lg font-semibold tracking-tight">Finora</span>
                   </div>
 
-                  <h2 className="max-w-xs text-3xl font-medium leading-tight lg:text-4xl">
+                  <h2 className="max-w-xs text-2xl sm:text-3xl font-medium leading-tight lg:text-4xl">
                     Build your financial clarity from day one.
                   </h2>
 
-                  <p className="mt-4 max-w-xs text-xs leading-relaxed text-white/70">
+                  <p className="mt-3 md:mt-4 max-w-xs text-xs leading-relaxed text-white/70">
                     Finora connects your real-world income, recurring commitments, and emergency fund baselines into an automated cockpit.
                   </p>
 
-                  <div className="mt-8 space-y-3">
+                  <div className="mt-6 md:mt-8 space-y-3">
                     <div className="flex items-center gap-3 rounded-2xl bg-white/5 p-3 backdrop-blur-sm border border-white/10">
                       <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-400/20 text-emerald-300">
                         <Shield size={14} />
@@ -318,7 +320,7 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-white/50">
+                <div className="mt-6 md:mt-0 flex items-center justify-between text-xs text-white/50">
                   <span>India • UAE</span>
                 </div>
               </>
@@ -418,8 +420,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* ================= 3D PHYSICAL FLIPPING LEAF =================
-            Only enabled on md: (laptop/desktop) to preserve the exact desktop book animation */}
+        {/* ================= 1. DESKTOP/LAPTOP HORIZONTAL 3D LEAF (md: and up) ================= */}
         {flippingDirection && (
           <div
             style={{
@@ -433,7 +434,6 @@ export default function LoginPage() {
                 : "left-0 -mr-[1px] animate-flip-right"
             }`}
           >
-            {/* FRONT FACE OF TURNING LEAF */}
             <div
               style={{
                 backfaceVisibility: "hidden",
@@ -444,7 +444,6 @@ export default function LoginPage() {
               <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/5" />
             </div>
 
-            {/* BACK FACE OF TURNING LEAF */}
             <div
               style={{
                 transform: "rotateY(180deg)",
@@ -457,6 +456,46 @@ export default function LoginPage() {
             </div>
           </div>
         )}
+
+        {/* ================= 2. MOBILE/TABLET VERTICAL 3D LEAF (< md) ================= */}
+        {flippingDirection && (
+          <div
+            style={{
+              transformOrigin:
+                flippingDirection === "toRegister" ? "center bottom" : "center top",
+              transformStyle: "preserve-3d",
+            }}
+            className={`pointer-events-none md:hidden absolute left-0 right-0 z-30 w-full h-[50.5%] shadow-2xl ${
+              flippingDirection === "toRegister"
+                ? "top-0 -mb-[1px] animate-flip-down"
+                : "top-1/2 -mt-[1px] animate-flip-up"
+            }`}
+          >
+            {/* Front face of vertical leaf */}
+            <div
+              style={{
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+              }}
+              className="absolute inset-0 bg-[#fdfdfb] border border-[#e7e5df]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/5" />
+            </div>
+
+            {/* Back face of vertical leaf */}
+            <div
+              style={{
+                transform: "rotateX(180deg)",
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+              }}
+              className="absolute inset-0 bg-[#fafaf8] border border-[#e7e5df]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/10" />
+            </div>
+          </div>
+        )}
+
       </div>
     </main>
   );
