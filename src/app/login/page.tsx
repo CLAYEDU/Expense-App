@@ -40,15 +40,12 @@ export default function LoginPage() {
     setTimeout(() => {
       setMode(targetMode);
       window.history.replaceState(null, "", `/${targetMode}`);
-    }, 3200);
-
-    // setMode(targetMode);
-    // window.history.replaceState(null, "", `/${targetMode}`);
+    }, 650);
 
     // Finish full 180-degree landing before removing the overlay
     setTimeout(() => {
       setFlippingDirection(null);
-    }, 3300);
+    }, 750);
   }
 
   // Handle Form Submissions
@@ -119,19 +116,21 @@ export default function LoginPage() {
   const isAnimating = flippingDirection !== null;
 
   return (
-    <main className="h-screen w-full overflow-hidden bg-[#f7f6f2] px-4 py-4 sm:px-6 sm:py-6 flex items-center justify-center">
-      {/* Outer Book Spread Container */}
-      <div className="relative w-full max-w-4xl h-[610px] overflow-hidden rounded-[32px] border border-[#e7e5df] bg-white shadow-[0_25px_70px_rgba(0,0,0,0.08)] [perspective:2600px]">
+    <main className="min-h-screen w-full bg-[#f7f6f2] px-4 py-8 sm:px-6 sm:py-10 md:h-screen md:overflow-hidden md:py-6 flex items-center justify-center">
+      {/* Outer Container: Auto-height & clean scrolling on mobile/tablet, exact 610px fixed 3D book spread on laptop/desktop */}
+      <div className="relative w-full max-w-md md:max-w-4xl min-h-[580px] md:h-[610px] overflow-hidden rounded-[28px] sm:rounded-[32px] border border-[#e7e5df] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.06)] md:shadow-[0_25px_70px_rgba(0,0,0,0.08)] md:[perspective:2600px]">
         
         {/* ================= BACKGROUND SPREAD ================= */}
-        <div className="grid h-full w-full grid-cols-1 md:grid-cols-2">
+        <div className="flex flex-col md:grid h-full w-full md:grid-cols-2">
           
-          {/* LEFT COLUMN: Green Cover on Login / Register Form on Register */}
+          {/* ================= LEFT COLUMN =================
+              - Desktop: Green Cover on Login / Register Form on Register
+              - Mobile/Tablet: Renders ONLY when in Register mode (so mobile users immediately see the Register form) */}
           <div
-            className={`p-8 lg:p-10 flex flex-col justify-between transition-colors duration-500 ${
+            className={`p-6 sm:p-8 lg:p-10 flex flex-col justify-between transition-colors duration-500 ${
               isRegister
-                ? "bg-[#fafaf8] text-neutral-800"
-                : "bg-[#173d32] text-white border-r border-[#123027]"
+                ? "flex bg-[#fafaf8] text-neutral-800"
+                : "hidden md:flex bg-[#173d32] text-white border-r border-[#123027]"
             }`}
           >
             {isRegister ? (
@@ -152,7 +151,7 @@ export default function LoginPage() {
                     disabled={googleLoading || loading || isAnimating}
                     className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-[#deddd7] bg-white px-4 py-2 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-50 active:scale-[0.99] disabled:opacity-60"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                       <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
@@ -263,20 +262,19 @@ export default function LoginPage() {
                 </div>
                 <div className="flex items-center justify-between text-xs text-white/50">
                   <span>India • UAE</span>
-                  {/* <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-400">
-                    Sign In
-                  </span> */}
                 </div>
               </>
             )}
           </div>
 
-          {/* RIGHT COLUMN: Sign In Form on Login / Green Info Card on Register */}
+          {/* ================= RIGHT COLUMN =================
+              - Desktop: Sign In Form on Login / Green Info Card on Register
+              - Mobile/Tablet: Renders ONLY when in Login mode (so mobile users immediately see the Login form) */}
           <div
-            className={`p-8 lg:p-10 flex flex-col justify-between transition-colors duration-500 ${
+            className={`p-6 sm:p-8 lg:p-10 flex flex-col justify-between transition-colors duration-500 ${
               isRegister
-                ? "bg-[#173d32] text-white border-l border-[#123027]"
-                : "bg-white text-neutral-800"
+                ? "hidden md:flex bg-[#173d32] text-white border-l border-[#123027]"
+                : "flex bg-white text-neutral-800"
             }`}
           >
             {isRegister ? (
@@ -322,9 +320,6 @@ export default function LoginPage() {
 
                 <div className="flex items-center justify-between text-xs text-white/50">
                   <span>India • UAE</span>
-                  {/* <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-400">
-                    Step 1 of 2
-                  </span> */}
                 </div>
               </>
             ) : (
@@ -344,7 +339,7 @@ export default function LoginPage() {
                   disabled={googleLoading || loading || isAnimating}
                   className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-[#deddd7] bg-white px-4 py-2 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-50 active:scale-[0.99] disabled:opacity-60"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
@@ -423,7 +418,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* ================= 3D PHYSICAL FLIPPING LEAF (FULL 180° REACH) ================= */}
+        {/* ================= 3D PHYSICAL FLIPPING LEAF =================
+            Only enabled on md: (laptop/desktop) to preserve the exact desktop book animation */}
         {flippingDirection && (
           <div
             style={{
@@ -431,7 +427,7 @@ export default function LoginPage() {
                 flippingDirection === "toRegister" ? "left center" : "right center",
               transformStyle: "preserve-3d",
             }}
-            className={`pointer-events-none absolute top-0 bottom-0 z-30 h-full w-[50.5%] shadow-2xl ${
+            className={`pointer-events-none hidden md:block absolute top-0 bottom-0 z-30 h-full w-[50.5%] shadow-2xl ${
               flippingDirection === "toRegister"
                 ? "left-1/2 -ml-[1px] animate-flip-left"
                 : "left-0 -mr-[1px] animate-flip-right"
@@ -445,11 +441,10 @@ export default function LoginPage() {
               }}
               className="absolute inset-0 bg-[#fdfdfb] border border-[#e7e5df]"
             >
-              {/* Spine crease shadow */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/5" />
             </div>
 
-            {/* BACK FACE OF TURNING LEAF (Land-sealing opaque paper) */}
+            {/* BACK FACE OF TURNING LEAF */}
             <div
               style={{
                 transform: "rotateY(180deg)",
@@ -458,7 +453,6 @@ export default function LoginPage() {
               }}
               className="absolute inset-0 bg-[#fafaf8] border border-[#e7e5df]"
             >
-              {/* Reverse crease shadow */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/5 via-transparent to-black/10" />
             </div>
           </div>
