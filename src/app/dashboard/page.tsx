@@ -4,12 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FinancialInsightsLoader from "@/components/financial/FinancialInsightsLoader";
+import UpdateReservesModal, { type ReserveTab } from "@/components/financial/UpdateReservesModal";
 
 import { useAuth } from "@/components/auth-provider";
 import { getFinancialProfile } from "@/lib/financial-profile";
 import { getExpenses, type Expense } from "@/lib/expenses";
 import { getBudgets, DEFAULT_BUDGETS, type BudgetMap } from "@/lib/budgets";
 import { getGoals, getGoalProgress, type Goal } from "@/lib/goals";
+import HelpPopover from "@/components/financial/HelpPopOver";
+
 import {
   getRecurringExpenses,
   getRecurringStatus,
@@ -55,6 +58,8 @@ import {
   AlertCircle,
   FileText,
   X,
+  Bot,
+  ListChecks,
 } from "lucide-react";
 import { logoutUser } from "@/lib/auth";
 
@@ -285,6 +290,10 @@ export default function DashboardPage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showMobileActionMenu, setShowMobileActionMenu] = useState(false);
 
+  // Reserves Modal State
+  const [showReservesModal, setShowReservesModal] = useState(false);
+  const [selectedReserveTab, setSelectedReserveTab] = useState<ReserveTab>("savings");
+
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const loadDashboard = useCallback(async () => {
@@ -456,6 +465,11 @@ export default function DashboardPage() {
       },
     ];
   }, [analysis]);
+
+  function openReserveManager(tab: ReserveTab) {
+    setSelectedReserveTab(tab);
+    setShowReservesModal(true);
+  }
 
   async function handleLogout() {
     await logoutUser();
@@ -760,13 +774,21 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 1. Frosted Glass Top 4 KPI Cards */}
+        {/* ================= 1. FROSTED GLASS TOP 4 KPI CARDS ================= */}
         <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Card 1: Monthly Inflow with Help Button */}
           <div className="group relative overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Monthly Inflow
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                  Monthly Inflow
+                </p>
+                <HelpPopover
+                  title="What is Monthly Inflow?"
+                  description="This is the total money that enters your account each month, such as your job salary, freelancing, or business income."
+                  example="If your salary is INR 20,000 every month, your monthly inflow is INR 20,000."
+                />
+              </div>
               <div className="rounded-2xl bg-emerald-500/15 p-2.5 text-emerald-700 shadow-sm transition group-hover:scale-110">
                 <ArrowDownLeft size={18} />
               </div>
@@ -785,11 +807,19 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Card 2: Recorded Outflow with Help Button */}
           <div className="group relative overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Recorded Outflow
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                  Recorded Outflow
+                </p>
+                <HelpPopover
+                  title="What is Recorded Outflow?"
+                  description="This is the total amount of money you have actually spent and logged this month on day-to-day living expenses (like groceries, shopping, dining, or bills)."
+                  example="If you logged an INR 333 bill, your recorded outflow shows INR 333."
+                />
+              </div>
               <div className="rounded-2xl bg-amber-500/15 p-2.5 text-amber-700 shadow-sm transition group-hover:scale-110">
                 <Receipt size={18} />
               </div>
@@ -805,6 +835,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Card 3: Net Monthly Buffer */}
           <div
             className={`group relative overflow-hidden rounded-[32px] border p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl ${
               isSurplusNegative
@@ -813,9 +844,16 @@ export default function DashboardPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-                Net Monthly Buffer
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                  Net Monthly Buffer
+                </p>
+                <HelpPopover
+                  title="What is Net Monthly Buffer?"
+                  description="This is the breathing room left in your wallet this month. It shows the exact cash remaining after subtracting all your day-to-day recorded spending from your monthly income."
+                  example="If your income is INR 20,000 and you have spent INR 333 so far, your net buffer is INR 19,667. This is the unspent cash available for extra savings, investments, or surprise expenses."
+                />
+              </div>
               <div
                 className={`rounded-2xl p-2.5 shadow-sm transition group-hover:scale-110 ${
                   isSurplusNegative
@@ -826,6 +864,7 @@ export default function DashboardPage() {
                 <Wallet size={18} />
               </div>
             </div>
+          
             <p
               className={`mt-4 text-3xl font-black tracking-tight ${
                 isSurplusNegative ? "text-red-700" : "text-emerald-950"
@@ -837,6 +876,7 @@ export default function DashboardPage() {
               </span>
               {formatAmount(analysis.remainingAfterActualExpenses)}
             </p>
+          
             <div className="mt-4 text-xs font-bold text-neutral-600">
               {isSurplusNegative
                 ? "Deficit: Spends exceeded cashflow"
@@ -844,6 +884,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Card 4: Savings Efficiency */}
           <div className="group relative overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
@@ -869,7 +910,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 2. Interactive 2D Pie Chart Section */}
+        {/* ================= 2. INTERACTIVE 2D PIE CHART SECTION ================= */}
         <section className="mt-8">
           <div className="relative overflow-hidden rounded-[36px] border border-white/80 bg-white/50 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:shadow-[0_25px_60px_-10px_rgba(16,185,129,0.15)]">
             <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-400/25 blur-[70px]" />
@@ -885,9 +926,21 @@ export default function DashboardPage() {
                     Real-Time Allocation
                   </span>
                 </div>
-                <h2 className="mt-1 text-2xl font-black tracking-tight text-neutral-950">
-                  Capital Distribution
-                </h2>
+                
+                {/* Header Text with Help Button */}
+                <div className="mt-1 flex items-center gap-2">
+                  <h2 className="text-2xl font-black tracking-tight text-neutral-950">
+                    Capital Distribution
+                  </h2>
+                  <HelpPopover
+                    title="How to Read This Chart"
+                    description="This chart divides your monthly income into three simple buckets: 
+                    (1) Fixed Commitments: like rent or EMIs that you must pay.
+                    (2) Living & Flexible Spends: Living Spends that you have recorded so far. 
+                    (3) Liquid Buffer: which is the remaining cash left to save or invest."
+                    example="If your income is INR 20,000, and you spend INR 333, the chart shows where every Rupee stands right now."
+                  />
+                </div>
                 <p className="mt-0.5 text-xs text-neutral-500">
                   Touch or hover any segment to inspect verified allocation across commitments and liquid buffer.
                 </p>
@@ -917,9 +970,24 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ================= 3. ACTIONABLE INSIGHTS & AI ENGINE ================= */}
+        {/* ================= 3. DIFFERENTIATED FINANCIAL INTELLIGENCE & ACTION PLAYBOOK ================= */}
         <section className="mt-8 space-y-6">
+          {/* Engine 1: Finora AI Financial Intelligence */}
           <div className="overflow-hidden rounded-[36px] border border-white/80 bg-white/50 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
+            <div className="mb-4 flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-sm">
+                <Bot size={17} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-neutral-950">
+                  Finora AI Financial Intelligence
+                </h3>
+                <p className="text-[11px] font-semibold text-neutral-500">
+                  Live observations and anomaly detection tailored to your profile
+                </p>
+              </div>
+            </div>
+
             <FinancialInsightsLoader
               uid={user.uid}
               profile={{
@@ -942,7 +1010,24 @@ export default function DashboardPage() {
             />
           </div>
 
-          <RecommendationsPanel recommendations={recommendations} />
+          {/* Engine 2: Strategic Financial Playbook */}
+          <div className="overflow-hidden rounded-[36px] border border-white/80 bg-white/50 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
+            <div className="mb-4 flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-teal-600 to-cyan-600 text-white shadow-sm">
+                <ListChecks size={17} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-neutral-950">
+                  Strategic Financial Playbook
+                </h3>
+                <p className="text-[11px] font-semibold text-neutral-500">
+                  Rule-based milestones, debt reduction targets, and runway action items
+                </p>
+              </div>
+            </div>
+
+            <RecommendationsPanel recommendations={recommendations} />
+          </div>
         </section>
 
         {/* ================= 4. UPCOMING COMMITMENTS (RECURRING EXPENSES) ================= */}
@@ -1150,7 +1235,7 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {/* 6. Category Breakdown & Capital Reserves */}
+        {/* ================= 6. CATEGORY BREAKDOWN & 4 WORKABLE CAPITAL RESERVES ================= */}
         <section className="mt-8 grid gap-7 lg:grid-cols-[1.3fr_1fr]">
           <div className="rounded-[36px] border border-white/80 bg-white/55 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl">
             <CategoryBreakdown
@@ -1167,7 +1252,7 @@ export default function DashboardPage() {
                     Net Capital Reserves
                   </h2>
                   <p className="mt-0.5 text-xs text-neutral-400">
-                    Calculated safety buffers and investments
+                    Manage real-time savings, investment targets, and debt caps
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/90 bg-white/80 p-2.5 text-neutral-700 shadow-sm backdrop-blur-md">
@@ -1176,6 +1261,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="mt-6 space-y-3.5">
+                {/* 1. Liquid Savings (Now Workable) */}
                 <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-800">
@@ -1190,11 +1276,16 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <span className="rounded-xl border border-white/80 bg-white/80 px-2.5 py-1 text-[10px] font-black text-neutral-600">
-                    Instant
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openReserveManager("savings")}
+                    className="flex items-center gap-1 rounded-xl border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-800 hover:bg-emerald-100 transition active:scale-95"
+                  >
+                    <Plus size={12} /> Add Cash
+                  </button>
                 </div>
 
+                {/* 2. Investments (Workable) */}
                 <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-teal-500/15 text-teal-800">
@@ -1209,11 +1300,74 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <span className="rounded-xl border border-white/80 bg-white/80 px-2.5 py-1 text-[10px] font-black text-neutral-600">
-                    Growth
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openReserveManager("investment")}
+                    className="flex items-center gap-1 rounded-xl border border-teal-200/80 bg-teal-50 px-2.5 py-1 text-[10px] font-black text-teal-800 hover:bg-teal-100 transition active:scale-95"
+                  >
+                    <Plus size={12} /> Top-up
+                  </button>
                 </div>
 
+                {/* 3. Emergency Fund (Workable with 3-Month Target Progress) */}
+                <div className="rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-800">
+                        <ShieldCheck size={18} />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                          Emergency Fund
+                        </span>
+                        <p className="text-sm font-black text-neutral-900">
+                          {profile.currency} {formatAmount(analysis.currentEmergencyFund)}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openReserveManager("emergency")}
+                      className="flex items-center gap-1 rounded-xl border border-cyan-200/80 bg-cyan-50 px-2.5 py-1 text-[10px] font-black text-cyan-800 hover:bg-cyan-100 transition active:scale-95"
+                    >
+                      <Plus size={12} /> Add Fund
+                    </button>
+                  </div>
+
+                  <div className="mt-3 border-t border-black/5 pt-2.5">
+                    <div className="flex justify-between text-[11px] font-bold text-neutral-500">
+                      <span>
+                        Target: {profile.currency} {formatAmount(analysis.emergencyFundTarget)} (3-Mo Runway)
+                      </span>
+                      <span>
+                        {Math.min(
+                          Math.round(
+                            (analysis.currentEmergencyFund /
+                              Math.max(analysis.emergencyFundTarget, 1)) *
+                              100
+                          ),
+                          100
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-neutral-200/60">
+                      <div
+                        className="h-full rounded-full bg-cyan-500 transition-all duration-700"
+                        style={{
+                          width: `${Math.min(
+                            (analysis.currentEmergencyFund /
+                              Math.max(analysis.emergencyFundTarget, 1)) *
+                              100,
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Monthly EMIs (Now Workable) */}
                 <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-800">
@@ -1228,37 +1382,23 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <span className="rounded-xl border border-amber-200/60 bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-800">
-                    Recurring
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-800">
-                      <ShieldCheck size={18} />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-                        3-Month Safety Target
-                      </span>
-                      <p className="text-sm font-black text-neutral-900">
-                        {profile.currency} {formatAmount(analysis.emergencyFundTarget)}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="rounded-xl border border-cyan-200/60 bg-cyan-50 px-2.5 py-1 text-[10px] font-black text-cyan-800">
-                    Shield
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openReserveManager("emi")}
+                    className="flex items-center gap-1 rounded-xl border border-amber-200/60 bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-800 hover:bg-amber-100 transition active:scale-95"
+                  >
+                    Edit Cap
+                  </button>
                 </div>
               </div>
             </div>
 
             <button
-              onClick={() => router.push("/setup")}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/90 bg-white/90 py-3.5 text-xs font-extrabold text-neutral-800 shadow-sm transition hover:bg-white hover:shadow-md"
+              type="button"
+              onClick={() => openReserveManager("savings")}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/90 bg-white/90 py-3.5 text-xs font-extrabold text-neutral-800 shadow-sm transition hover:bg-white hover:shadow-md active:scale-95"
             >
-              Update Capital Figures
+              Deposit / Adjust All Reserves
               <ChevronRight size={14} />
             </button>
           </div>
@@ -1445,6 +1585,23 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Reserves Modal Instance */}
+      <UpdateReservesModal
+        uid={user.uid}
+        currency={profile.currency}
+        initialTab={selectedReserveTab}
+        currentSavings={analysis.currentSavings}
+        currentEmergencyFund={analysis.currentEmergencyFund}
+        currentInvestments={analysis.currentInvestments}
+        currentEmi={analysis.emiAmount}
+        isOpen={showReservesModal}
+        onClose={() => setShowReservesModal(false)}
+        onSuccess={async () => {
+          // Re-fetch the freshly updated Firestore document and recalculate the dashboard
+          await loadDashboard();
+        }}
+      />
     </main>
   );
 }
