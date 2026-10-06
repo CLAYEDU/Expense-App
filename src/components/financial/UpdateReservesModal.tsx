@@ -59,6 +59,8 @@ export default function UpdateReservesModal({
         return Number(currentEmergencyFund) || 0;
       case "emi":
         return Number(currentEmi) || 0;
+      default:
+        return 0;
     }
   };
 
@@ -108,8 +110,9 @@ export default function UpdateReservesModal({
       setLoading(true);
       setError(null);
 
-      const finalValue = mode === "topup" ? currentVal + val : val;
-      const updates: ReserveUpdates = {};
+      const baseVal = getCurrentVal();
+      const finalValue = mode === "topup" ? baseVal + val : val;
+      const updates: Parameters<typeof updateFinancialReserves>[1] = {};
 
       if (activeTab === "savings") {
         updates.currentSavings = finalValue;

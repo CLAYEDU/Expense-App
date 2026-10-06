@@ -12,6 +12,7 @@ import { getExpenses, type Expense } from "@/lib/expenses";
 import { getBudgets, DEFAULT_BUDGETS, type BudgetMap } from "@/lib/budgets";
 import { getGoals, getGoalProgress, type Goal } from "@/lib/goals";
 import HelpPopover from "@/components/financial/HelpPopOver";
+import ReservesDistributionChart from "@/components/financial/ReserveDistributionChart";
 
 import {
   getRecurringExpenses,
@@ -1236,7 +1237,7 @@ export default function DashboardPage() {
         </section>
 
         {/* ================= 6. CATEGORY BREAKDOWN & 4 WORKABLE CAPITAL RESERVES ================= */}
-        <section className="mt-8 grid gap-7 lg:grid-cols-[1.3fr_1fr]">
+        <section className="mt-8 grid gap-7 lg:grid-cols-[1.3fr_1.1fr]">
           <div className="rounded-[36px] border border-white/80 bg-white/55 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl">
             <CategoryBreakdown
               data={analysis.categoryBreakdown}
@@ -1260,15 +1261,25 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-6 space-y-3.5">
-                {/* 1. Liquid Savings (Now Workable) */}
-                <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
+              {/* NEW: Dedicated Accumulated Wealth Donut Chart */}
+              <div className="mt-5">
+                <ReservesDistributionChart
+                  savings={analysis.currentSavings}
+                  investments={analysis.currentInvestments}
+                  emergencyFund={analysis.currentEmergencyFund}
+                  currency={profile.currency}
+                />
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {/* 1. Liquid Savings */}
+                <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-3.5 shadow-xs backdrop-blur-md">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-800">
-                      <PiggyBank size={18} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-800">
+                      <PiggyBank size={17} />
                     </div>
                     <div>
-                      <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                         Liquid Savings
                       </span>
                       <p className="text-sm font-black text-neutral-900">
@@ -1285,14 +1296,14 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                {/* 2. Investments (Workable) */}
-                <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
+                {/* 2. Investments */}
+                <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-3.5 shadow-xs backdrop-blur-md">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-teal-500/15 text-teal-800">
-                      <TrendingUp size={18} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-500/15 text-teal-800">
+                      <TrendingUp size={17} />
                     </div>
                     <div>
-                      <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                         Investments
                       </span>
                       <p className="text-sm font-black text-neutral-900">
@@ -1309,15 +1320,15 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                {/* 3. Emergency Fund (Workable with 3-Month Target Progress) */}
-                <div className="rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
+                {/* 3. Emergency Fund */}
+                <div className="rounded-2xl border border-white/80 bg-white/70 p-3.5 shadow-xs backdrop-blur-md">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-800">
-                        <ShieldCheck size={18} />
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-800">
+                        <ShieldCheck size={17} />
                       </div>
                       <div>
-                        <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                           Emergency Fund
                         </span>
                         <p className="text-sm font-black text-neutral-900">
@@ -1334,8 +1345,8 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
-                  <div className="mt-3 border-t border-black/5 pt-2.5">
-                    <div className="flex justify-between text-[11px] font-bold text-neutral-500">
+                  <div className="mt-2.5 border-t border-black/5 pt-2">
+                    <div className="flex justify-between text-[10px] font-bold text-neutral-500">
                       <span>
                         Target: {profile.currency} {formatAmount(analysis.emergencyFundTarget)} (3-Mo Runway)
                       </span>
@@ -1367,14 +1378,14 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* 4. Monthly EMIs (Now Workable) */}
-                <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-4 shadow-xs backdrop-blur-md">
+                {/* 4. Monthly EMIs */}
+                <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-3.5 shadow-xs backdrop-blur-md">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-800">
-                      <Receipt size={18} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-800">
+                      <Receipt size={17} />
                     </div>
                     <div>
-                      <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                         Monthly EMIs
                       </span>
                       <p className="text-sm font-black text-neutral-900">
@@ -1396,7 +1407,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => openReserveManager("savings")}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/90 bg-white/90 py-3.5 text-xs font-extrabold text-neutral-800 shadow-sm transition hover:bg-white hover:shadow-md active:scale-95"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/90 bg-white/90 py-3 text-xs font-extrabold text-neutral-800 shadow-sm transition hover:bg-white hover:shadow-md active:scale-95"
             >
               Deposit / Adjust All Reserves
               <ChevronRight size={14} />
@@ -1591,14 +1602,76 @@ export default function DashboardPage() {
         uid={user.uid}
         currency={profile.currency}
         initialTab={selectedReserveTab}
-        currentSavings={analysis.currentSavings}
-        currentEmergencyFund={analysis.currentEmergencyFund}
-        currentInvestments={analysis.currentInvestments}
-        currentEmi={analysis.emiAmount}
+        currentSavings={
+          analysis.currentSavings ?? (profile as any)?.currentSavings ?? 0
+        }
+        currentEmergencyFund={
+          analysis.currentEmergencyFund ?? (profile as any)?.currentEmergencyFund ?? 0
+        }
+        currentInvestments={
+          analysis.currentInvestments ?? (profile as any)?.currentInvestments ?? 0
+        }
+        currentEmi={
+          analysis.emiAmount ??
+          (profile as any)?.emiAmount ??
+          (profile as any)?.monthlyEmi ??
+          (profile as any)?.emi ??
+          0
+        }
         isOpen={showReservesModal}
         onClose={() => setShowReservesModal(false)}
-        onSuccess={async () => {
-          // Re-fetch the freshly updated Firestore document and recalculate the dashboard
+        onSuccess={async (appliedUpdates) => {
+          if (appliedUpdates && profile) {
+            // 1. Instantly update local profile state
+            const updatedProfile = {
+              ...profile,
+              ...(appliedUpdates.currentSavings !== undefined && {
+                currentSavings: appliedUpdates.currentSavings,
+                savings: appliedUpdates.currentSavings,
+              }),
+              ...(appliedUpdates.currentInvestments !== undefined && {
+                currentInvestments: appliedUpdates.currentInvestments,
+                monthlyInvestments: appliedUpdates.currentInvestments,
+              }),
+              ...(appliedUpdates.currentEmergencyFund !== undefined && {
+                currentEmergencyFund: appliedUpdates.currentEmergencyFund,
+                emergencyFund: appliedUpdates.currentEmergencyFund,
+              }),
+              ...(appliedUpdates.emiAmount !== undefined && {
+                emiAmount: appliedUpdates.emiAmount,
+                monthlyEmi: appliedUpdates.emiAmount,
+                emi: appliedUpdates.emiAmount,
+              }),
+            };
+            setProfile(updatedProfile);
+
+            // 2. Instantly recalculate the financial analysis engine
+            const raw = updatedProfile as any;
+            const freshEngineInput: FinancialProfileForEngine = {
+              monthlyIncome: Number(raw.monthlyIncome ?? 0),
+              essentialExpenses: Number(raw.essentialExpenses ?? 0),
+              otherFixedExpenses: Number(
+                raw.otherFixedExpenses ?? raw.recurringExpenses ?? 0
+              ),
+              emiAmount: Number(raw.emiAmount ?? raw.monthlyEmi ?? raw.emi ?? 0),
+              currentSavings: Number(raw.currentSavings ?? 0),
+              currentInvestments: Number(
+                raw.currentInvestments ?? raw.monthlyInvestments ?? 0
+              ),
+              currentEmergencyFund: Number(
+                raw.currentEmergencyFund ?? raw.emergencyFund ?? 0
+              ),
+              monthlySavingsTarget: raw.monthlySavingsTarget
+                ? Number(raw.monthlySavingsTarget)
+                : undefined,
+              currency: raw.currency || "INR",
+            };
+
+            const recalculated = analyzeFinances(freshEngineInput, expenses);
+            setAnalysis(recalculated);
+          }
+
+          // 3. Re-sync in the background from Firestore
           await loadDashboard();
         }}
       />

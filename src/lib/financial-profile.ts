@@ -64,22 +64,22 @@ export async function updateFinancialReserves(
   };
 
   if (updates.currentSavings !== undefined) {
-    const val = Number(updates.currentSavings);
+    const val = Number(updates.currentSavings) || 0;
     payload.currentSavings = val;
     payload.savings = val;
   }
   if (updates.currentInvestments !== undefined) {
-    const val = Number(updates.currentInvestments);
+    const val = Number(updates.currentInvestments) || 0;
     payload.currentInvestments = val;
     payload.monthlyInvestments = val;
   }
   if (updates.currentEmergencyFund !== undefined) {
-    const val = Number(updates.currentEmergencyFund);
+    const val = Number(updates.currentEmergencyFund) || 0;
     payload.currentEmergencyFund = val;
     payload.emergencyFund = val;
   }
   if (updates.emiAmount !== undefined) {
-    const val = Number(updates.emiAmount);
+    const val = Number(updates.emiAmount) || 0;
     payload.emiAmount = val;
     payload.monthlyEmi = val;
     payload.emi = val;
