@@ -13,6 +13,11 @@ import { getBudgets, DEFAULT_BUDGETS, type BudgetMap } from "@/lib/budgets";
 import { getGoals, getGoalProgress, type Goal } from "@/lib/goals";
 import HelpPopover from "@/components/financial/HelpPopOver";
 import ReservesDistributionChart from "@/components/financial/ReserveDistributionChart";
+import FlashWarning from "@/components/financial/FlashWarning";
+import { generateCorporateFinancialReport } from "@/lib/pdf-export";
+import { Download } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable, { UserOptions } from "jspdf-autotable";
 
 import {
   getRecurringExpenses,
@@ -511,8 +516,9 @@ export default function DashboardPage() {
     ).format(Math.abs(amount));
 
   const isSurplusNegative = analysis.remainingAfterActualExpenses < 0;
-  const isHealthy = !isSurplusNegative;
+  const isHealthy = !isSurplusNegative;    
 
+    {/* Remainder of the dashboard */}
   return (
     <main className="relative min-h-screen bg-[#edf2ee] text-neutral-900 antialiased selection:bg-emerald-500/20 selection:text-emerald-900">
       {/* Ambient Aurora Glow */}
@@ -747,8 +753,48 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* Session-only Flash Warning */}
+      <FlashWarning
+      monthlyIncome={analysis.monthlyIncome}
+      totalExpenses={analysis.totalExpenses}
+      emiAmount={analysis.emiAmount}
+      emergencyFund={analysis.currentEmergencyFund}
+      emergencyTarget={analysis.emergencyFundTarget}
+      currency={profile.currency}
+    />
+
+    {/* Export PDF Button Aligned to the Right */}
+<div className="flex justify-end pb-4">
+  <button
+    type="button"
+    onClick={() =>
+      generateCorporateFinancialReport({
+        currency: profile.currency,
+        monthlyIncome: analysis.monthlyIncome,
+        totalExpenses: analysis.totalExpenses,
+        netBuffer: analysis.remainingAfterActualExpenses,
+        savingsRate: analysis.savingsRate,
+        currentSavings: analysis.currentSavings,
+        currentInvestments: analysis.currentInvestments,
+        currentEmergencyFund: analysis.currentEmergencyFund,
+        emergencyTarget: analysis.emergencyFundTarget,
+        emiAmount: analysis.emiAmount,
+        categories: analysis.categoryBreakdown.map((c) => ({
+          name: c.category,
+          amount: c.amount,
+          percentage: c.percentage,
+        })),
+      })
+    }
+   className="mt-2 flex items-center gap-1.5 rounded-2xl border border-white/80 bg-white/80 px-4 py-2 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
+  >
+    <Download size={14} />
+    <span>Export PDF Report</span>
+  </button>
+</div>
+
       {/* Main Content */}
-      <div className="relative z-10 mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
+      <div className="relative z-10 mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-1">
         <section className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/80 bg-white/80 px-3.5 py-1 text-xs font-bold text-emerald-800 shadow-sm backdrop-blur-md">
