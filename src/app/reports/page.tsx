@@ -51,6 +51,20 @@ export default function ReportsPage() {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
+  const previousMonthKey = useMemo(() => getPreviousMonthKey(monthKey), [monthKey]);
+
+// Build previous month's report for direct MoM delta comparison
+const previousReport = useMemo(() => {
+  if (!profile) return null;
+  return buildMonthlyReport({
+    expenses,
+    budgets,
+    recurringExpenses,
+    monthKey: previousMonthKey,
+    monthlyIncome: Number(profile.monthlyIncome) || 0,
+    savingsTarget: Number(profile.monthlySavings) || 0,
+  });
+}, [profile, expenses, budgets, recurringExpenses, previousMonthKey]);
 
   // Close download menu on click outside
   useEffect(() => {
@@ -185,28 +199,35 @@ export default function ReportsPage() {
   }
 
   function exportPDF() {
-    if (!report || !profile) return;
-    setDownloadMenuOpen(false);
+  if (!report || !profile) return;
+  setDownloadMenuOpen(false);
 
-    generateMonthlyExecutivePDF({
-      currency: profile.currency,
-      monthLabel: report.monthLabel,
-      monthKey,
-      totalIncome: report.totalIncome,
-      totalExpenses: report.totalExpenses,
-      totalSavings: report.totalSavings,
-      savingsRate: report.savingsRate,
-      budgetTotal: report.budgetTotal,
-      budgetUsed: report.budgetUsed,
-      recurringCommitment: report.recurringMonthlyCommitment,
-      categoryBreakdown: report.categoryBreakdown.map((item) => ({
-        category: item.category,
-        budget: item.budget,
-        amount: item.amount,
-        budgetUsedPercentage: item.budgetUsedPercentage,
-      })),
-    });
-  }
+  // Map category breakdown with previous month numbers
+  const prevMap = new Map(
+    previousReport?.categoryBreakdown.map((c) => [c.category, c.amount]) || []
+  );
+
+  generateMonthlyExecutivePDF({
+    currency: profile.currency,
+    monthLabel: report.monthLabel,
+    monthKey,
+    totalIncome: report.totalIncome,
+    totalExpenses: report.totalExpenses,
+    totalSavings: report.totalSavings,
+    savingsRate: report.savingsRate,
+    budgetTotal: report.budgetTotal,
+    budgetUsed: report.budgetUsed,
+    recurringCommitment: report.recurringMonthlyCommitment,
+    previousMonthTotalExpenses: previousReport?.totalExpenses,
+    categoryBreakdown: report.categoryBreakdown.map((item) => ({
+      category: item.category,
+      budget: item.budget,
+      amount: item.amount,
+      previousMonthAmount: prevMap.get(item.category) ?? 0,
+      budgetUsedPercentage: item.budgetUsedPercentage,
+    })),
+  });
+}
 
   // Loading state with Apple Ambient Glass skeleton
   if (authLoading || loading || !profile) {

@@ -17,6 +17,48 @@ function clamp(value: number) {
   return Math.min(100, Math.max(0, value));
 }
 
+// Helper badge component for MoM delta:
+function MoMDeltaBadge({
+  currentAmount,
+  previousAmount,
+}: {
+  currentAmount: number;
+  previousAmount?: number;
+}) {
+  if (typeof previousAmount !== "number" || previousAmount === 0) {
+    return (
+      <span className="rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-500">
+        New
+      </span>
+    );
+  }
+
+  const diff = currentAmount - previousAmount;
+  const pct = Math.abs((diff / previousAmount) * 100).toFixed(1);
+
+  if (diff > 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded-md bg-red-500/10 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+        ▲ +{pct}% MoM
+      </span>
+    );
+  }
+
+  if (diff < 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+        ▼ -{pct}% MoM
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-500">
+      0% MoM
+    </span>
+  );
+}
+
 export default function MonthlyReportView({
   report,
   currency,
@@ -161,10 +203,7 @@ export default function MonthlyReportView({
               </div>
 
               <p className="mt-2 text-xs text-neutral-500">
-                {report.savingsTargetProgress.toFixed(
-                  0
-                )}
-                % of your target reached
+                {report.savingsTargetProgress.toFixed(0)}% of your target reached
               </p>
             </div>
           )}
@@ -195,9 +234,7 @@ export default function MonthlyReportView({
                     : "text-red-600"
                 }`}
               >
-                {report.savingsChange >= 0
-                  ? "+"
-                  : ""}
+                {report.savingsChange >= 0 ? "+" : ""}
                 {formatReportCurrency(
                   report.savingsChange,
                   currency
@@ -265,9 +302,7 @@ export default function MonthlyReportView({
                     currency
                   )} remaining`
                 : `${formatReportCurrency(
-                    Math.abs(
-                      report.budgetRemaining
-                    ),
+                    Math.abs(report.budgetRemaining),
                     currency
                   )} over`}
             </span>
@@ -300,18 +335,22 @@ export default function MonthlyReportView({
             </div>
           ) : (
             topCategories.map((item) => {
-              const status =
-                getBudgetStatus(
-                  item.budgetUsedPercentage
-                );
+              const status = getBudgetStatus(item.budgetUsedPercentage);
 
               return (
                 <div key={item.category}>
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-neutral-900">
-                        {item.category}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-neutral-900">
+                          {item.category}
+                        </p>
+                        {/* MoM delta badge beside category name */}
+                        <MoMDeltaBadge
+                          currentAmount={item.amount}
+                          previousAmount={(item as any).previousAmount}
+                        />
+                      </div>
 
                       <p className="text-xs text-neutral-500">
                         {item.percentage.toFixed(1)}% of total spending
@@ -320,10 +359,7 @@ export default function MonthlyReportView({
 
                     <div className="text-right">
                       <p className="text-sm font-semibold">
-                        {formatReportCurrency(
-                          item.amount,
-                          currency
-                        )}
+                        {formatReportCurrency(item.amount, currency)}
                       </p>
 
                       {item.budget > 0 && (
@@ -336,10 +372,7 @@ export default function MonthlyReportView({
                               : "text-emerald-600"
                           }`}
                         >
-                          {item.budgetUsedPercentage.toFixed(
-                            0
-                          )}
-                          % of budget
+                          {item.budgetUsedPercentage.toFixed(0)}% of budget
                         </p>
                       )}
                     </div>
@@ -349,9 +382,7 @@ export default function MonthlyReportView({
                     <div
                       className="h-full rounded-full bg-neutral-800 transition-all"
                       style={{
-                        width: `${clamp(
-                          item.percentage
-                        )}%`,
+                        width: `${clamp(item.percentage)}%`,
                       }}
                     />
                   </div>
@@ -375,99 +406,81 @@ export default function MonthlyReportView({
         </div>
 
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left text-sm">
+          <table className="w-full min-w-[700px] text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
-                <th className="pb-3 font-medium">
-                  Category
-                </th>
-
-                <th className="pb-3 font-medium">
-                  Budget
-                </th>
-
-                <th className="pb-3 font-medium">
-                  Actual
-                </th>
-
-                <th className="pb-3 font-medium">
-                  Usage
-                </th>
-
-                <th className="pb-3 font-medium">
-                  Status
-                </th>
+                <th className="pb-3 font-medium">Category</th>
+                <th className="pb-3 font-medium">Budget</th>
+                <th className="pb-3 font-medium">Actual</th>
+                <th className="pb-3 font-medium">MoM Trend</th>
+                <th className="pb-3 font-medium">Usage</th>
+                <th className="pb-3 font-medium">Status</th>
               </tr>
             </thead>
 
             <tbody>
-              {report.categoryBreakdown.map(
-                (item) => {
-                  const status =
-                    getBudgetStatus(
-                      item.budgetUsedPercentage
-                    );
+              {report.categoryBreakdown.map((item) => {
+                const status = getBudgetStatus(item.budgetUsedPercentage);
 
-                  return (
-                    <tr
-                      key={item.category}
-                      className="border-b border-neutral-100 last:border-0"
-                    >
-                      <td className="py-4 font-medium text-neutral-900">
-                        {item.category}
-                      </td>
+                return (
+                  <tr
+                    key={item.category}
+                    className="border-b border-neutral-100 last:border-0"
+                  >
+                    <td className="py-4 font-medium text-neutral-900">
+                      {item.category}
+                    </td>
 
-                      <td className="py-4 text-neutral-600">
-                        {item.budget > 0
-                          ? formatReportCurrency(
-                              item.budget,
-                              currency
-                            )
-                          : "Not set"}
-                      </td>
+                    <td className="py-4 text-neutral-600">
+                      {item.budget > 0
+                        ? formatReportCurrency(item.budget, currency)
+                        : "Not set"}
+                    </td>
 
-                      <td className="py-4 text-neutral-600">
-                        {formatReportCurrency(
-                          item.amount,
-                          currency
-                        )}
-                      </td>
+                    <td className="py-4 font-semibold text-neutral-900">
+                      {formatReportCurrency(item.amount, currency)}
+                    </td>
 
-                      <td className="py-4 text-neutral-600">
-                        {item.budget > 0
-                          ? `${item.budgetUsedPercentage.toFixed(
-                              0
-                            )}%`
-                          : "—"}
-                      </td>
+                    {/* Dedicated MoM Trend Column */}
+                    <td className="py-4">
+                      <MoMDeltaBadge
+                        currentAmount={item.amount}
+                        previousAmount={(item as any).previousAmount}
+                      />
+                    </td>
 
-                      <td className="py-4">
-                        {item.budget <= 0 ? (
-                          <span className="text-neutral-400">
-                            No budget
-                          </span>
-                        ) : (
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                              status === "over"
-                                ? "bg-red-50 text-red-700"
-                                : status === "near"
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-emerald-50 text-emerald-700"
-                            }`}
-                          >
-                            {status === "over"
-                              ? "Over budget"
+                    <td className="py-4 text-neutral-600">
+                      {item.budget > 0
+                        ? `${item.budgetUsedPercentage.toFixed(0)}%`
+                        : "—"}
+                    </td>
+
+                    <td className="py-4">
+                      {item.budget <= 0 ? (
+                        <span className="text-neutral-400">
+                          No budget
+                        </span>
+                      ) : (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            status === "over"
+                              ? "bg-red-50 text-red-700"
                               : status === "near"
-                              ? "Near limit"
-                              : "Within budget"}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                }
-              )}
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {status === "over"
+                            ? "Over budget"
+                            : status === "near"
+                            ? "Near limit"
+                            : "Within budget"}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

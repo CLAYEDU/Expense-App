@@ -15,9 +15,7 @@ import HelpPopover from "@/components/financial/HelpPopOver";
 import ReservesDistributionChart from "@/components/financial/ReserveDistributionChart";
 import FlashWarning from "@/components/financial/FlashWarning";
 import { generateCorporateFinancialReport } from "@/lib/pdf-export";
-import { Download } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable, { UserOptions } from "jspdf-autotable";
+import SafeToSpendCard from "@/components/dashboard/SafetoSpendCard";
 
 import {
   getRecurringExpenses,
@@ -45,6 +43,7 @@ import {
   ArrowUpRight,
   ArrowRight,
   ChevronRight,
+  Download,
   LogOut,
   PiggyBank,
   Plus,
@@ -70,7 +69,7 @@ import {
 import { logoutUser } from "@/lib/auth";
 
 // ============================================================================
-// 1. INLINE ROBUST 2D PIE CHART (Crash-proof against undefined/empty data)
+// 1. INLINE ROBUST 2D PIE CHART
 // ============================================================================
 
 export interface PieSegment {
@@ -472,6 +471,54 @@ export default function DashboardPage() {
     ];
   }, [analysis]);
 
+  // Compute Prior Month Expenses for Month-over-Month (MoM) Variance in PDF
+  const previousMonthExpenses = useMemo(() => {
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevYear = prevMonthDate.getFullYear();
+    const prevMonth = prevMonthDate.getMonth();
+
+    const prevCategoryMap = new Map<string, number>();
+    let prevTotal = 0;
+
+    expenses.forEach((exp) => {
+      const expDate = new Date(exp.date);
+      if (expDate.getFullYear() === prevYear && expDate.getMonth() === prevMonth) {
+        const amt = Number(exp.amount) || 0;
+        prevTotal += amt;
+        prevCategoryMap.set(exp.category, (prevCategoryMap.get(exp.category) || 0) + amt);
+      }
+    });
+
+    return { total: prevTotal, categoryMap: prevCategoryMap };
+  }, [expenses]);
+
+  async function handleExportPDF() {
+    if (!analysis || !profile) return;
+
+    await generateCorporateFinancialReport({
+      userName: user?.displayName || undefined,
+      userEmail: user?.email || undefined,
+      currency: profile.currency,
+      monthlyIncome: analysis.monthlyIncome,
+      totalExpenses: analysis.totalExpenses,
+      netBuffer: analysis.remainingAfterActualExpenses,
+      savingsRate: analysis.savingsRate,
+      currentSavings: analysis.currentSavings,
+      currentInvestments: analysis.currentInvestments,
+      currentEmergencyFund: analysis.currentEmergencyFund,
+      emergencyTarget: analysis.emergencyFundTarget,
+      emiAmount: analysis.emiAmount,
+      previousMonthExpenses: previousMonthExpenses.total,
+      categories: analysis.categoryBreakdown.map((c) => ({
+        name: c.category,
+        amount: c.amount,
+        percentage: c.percentage,
+        previousAmount: previousMonthExpenses.categoryMap.get(c.category) ?? 0,
+      })),
+    });
+  }
+
   function openReserveManager(tab: ReserveTab) {
     setSelectedReserveTab(tab);
     setShowReservesModal(true);
@@ -516,9 +563,8 @@ export default function DashboardPage() {
     ).format(Math.abs(amount));
 
   const isSurplusNegative = analysis.remainingAfterActualExpenses < 0;
-  const isHealthy = !isSurplusNegative;    
+  const isHealthy = !isSurplusNegative;
 
-    {/* Remainder of the dashboard */}
   return (
     <main className="relative min-h-screen bg-[#edf2ee] text-neutral-900 antialiased selection:bg-emerald-500/20 selection:text-emerald-900">
       {/* Ambient Aurora Glow */}
@@ -546,7 +592,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* ================= LAPTOP VIEW (lg:flex) ================= */}
+            {/* Laptop Navigation Links */}
             <div className="hidden lg:flex items-center gap-2">
               <Link
                 href="/reports"
@@ -594,7 +640,7 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* ================= MOBILE & TABLET VIEW (lg:hidden) ================= */}
+            {/* Mobile Actions Dropdown */}
             <div className="relative lg:hidden" ref={mobileMenuRef}>
               <button
                 type="button"
@@ -605,7 +651,6 @@ export default function DashboardPage() {
                     : "border-white/90 bg-white/75 text-neutral-900 hover:bg-white"
                 }`}
                 aria-label="Quick Actions Menu"
-                title="Quick Actions"
               >
                 <Plus
                   size={16}
@@ -618,7 +663,6 @@ export default function DashboardPage() {
                 </span>
               </button>
 
-              {/* Mobile Glass Popover Menu */}
               {showMobileActionMenu && (
                 <div className="absolute right-0 top-12 z-50 w-64 origin-top-right overflow-hidden rounded-[28px] border border-white/85 bg-white/80 p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200">
                   <div className="px-3 py-2 border-b border-black/5 flex items-center justify-between">
@@ -718,7 +762,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Notifications Pill */}
+            {/* Notifications */}
             <Link
               href="/notifications"
               className="relative rounded-2xl border border-white/90 bg-white/70 p-2 sm:p-2.5 text-neutral-600 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-neutral-900"
@@ -732,7 +776,7 @@ export default function DashboardPage() {
               )}
             </Link>
 
-            {/* Calibration Setup */}
+            {/* Setup */}
             <button
               onClick={() => router.push("/setup")}
               className="rounded-2xl border border-white/90 bg-white/70 p-2 sm:p-2.5 text-neutral-600 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-neutral-900"
@@ -755,47 +799,18 @@ export default function DashboardPage() {
 
       {/* Session-only Flash Warning */}
       <FlashWarning
-      monthlyIncome={analysis.monthlyIncome}
-      totalExpenses={analysis.totalExpenses}
-      emiAmount={analysis.emiAmount}
-      emergencyFund={analysis.currentEmergencyFund}
-      emergencyTarget={analysis.emergencyFundTarget}
-      currency={profile.currency}
-    />
+        monthlyIncome={analysis.monthlyIncome}
+        totalExpenses={analysis.totalExpenses}
+        emiAmount={analysis.emiAmount}
+        emergencyFund={analysis.currentEmergencyFund}
+        emergencyTarget={analysis.emergencyFundTarget}
+        currency={profile.currency}
+      />
 
-    {/* Export PDF Button Aligned to the Right */}
-<div className="flex justify-end pb-4">
-  <button
-    type="button"
-    onClick={() =>
-      generateCorporateFinancialReport({
-        currency: profile.currency,
-        monthlyIncome: analysis.monthlyIncome,
-        totalExpenses: analysis.totalExpenses,
-        netBuffer: analysis.remainingAfterActualExpenses,
-        savingsRate: analysis.savingsRate,
-        currentSavings: analysis.currentSavings,
-        currentInvestments: analysis.currentInvestments,
-        currentEmergencyFund: analysis.currentEmergencyFund,
-        emergencyTarget: analysis.emergencyFundTarget,
-        emiAmount: analysis.emiAmount,
-        categories: analysis.categoryBreakdown.map((c) => ({
-          name: c.category,
-          amount: c.amount,
-          percentage: c.percentage,
-        })),
-      })
-    }
-   className="mt-2 flex items-center gap-1.5 rounded-2xl border border-white/80 bg-white/80 px-4 py-2 text-xs font-bold text-neutral-800 shadow-sm backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
-  >
-    <Download size={14} />
-    <span>Export PDF Report</span>
-  </button>
-</div>
-
-      {/* Main Content */}
-      <div className="relative z-10 mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-1">
-        <section className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      {/* Main Dashboard Layout Container */}
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-6 sm:px-8 space-y-8">
+        {/* Header with Title & Single Clean PDF Export Action */}
+        <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/80 bg-white/80 px-3.5 py-1 text-xs font-bold text-emerald-800 shadow-sm backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -809,21 +824,38 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold text-neutral-500">
-              Savings Target:
-            </span>
-            <span className="rounded-2xl border border-white/90 bg-white/80 px-3.5 py-1.5 text-xs font-black text-emerald-900 shadow-sm backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#173d32] px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-[#173d32]/20 transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95"
+            >
+              <Download size={14} />
+              <span>Export PDF Report</span>
+            </button>
+
+            <span className="rounded-2xl border border-white/90 bg-white/80 px-3.5 py-2 text-xs font-black text-emerald-900 shadow-sm backdrop-blur-md hidden sm:inline-block">
               {profile.monthlySavings
-                ? `${profile.currency} ${formatAmount(profile.monthlySavings)}`
+                ? `Target: ${profile.currency} ${formatAmount(profile.monthlySavings)}`
                 : "20% Optimal Rule"}
             </span>
           </div>
         </section>
 
-        {/* ================= 1. FROSTED GLASS TOP 4 KPI CARDS ================= */}
+        {/* 1. Safe-to-Spend Daily Runway Hero Card */}
+        <section>
+          <SafeToSpendCard
+            monthlyIncome={analysis.monthlyIncome}
+            totalExpenses={analysis.totalExpenses}
+            emiAmount={analysis.emiAmount}
+            savingsTarget={profile.monthlySavings || 0}
+            currency={profile.currency}
+          />
+        </section>
+
+        {/* 2. Top 4 Frosted Glass KPI Cards */}
         <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: Monthly Inflow with Help Button */}
+          {/* Card 1: Monthly Inflow */}
           <div className="group relative overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -832,7 +864,7 @@ export default function DashboardPage() {
                 </p>
                 <HelpPopover
                   title="What is Monthly Inflow?"
-                  description="This is the total money that enters your account each month, such as your job salary, freelancing, or business income."
+                  description="This is the total money that enters your account each month, such as salary, freelancing, or business income."
                   example="If your salary is INR 20,000 every month, your monthly inflow is INR 20,000."
                 />
               </div>
@@ -854,7 +886,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 2: Recorded Outflow with Help Button */}
+          {/* Card 2: Recorded Outflow */}
           <div className="group relative overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -863,7 +895,7 @@ export default function DashboardPage() {
                 </p>
                 <HelpPopover
                   title="What is Recorded Outflow?"
-                  description="This is the total amount of money you have actually spent and logged this month on day-to-day living expenses (like groceries, shopping, dining, or bills)."
+                  description="This is the total amount of money you have actually spent and logged this month on day-to-day living expenses."
                   example="If you logged an INR 333 bill, your recorded outflow shows INR 333."
                 />
               </div>
@@ -897,8 +929,8 @@ export default function DashboardPage() {
                 </p>
                 <HelpPopover
                   title="What is Net Monthly Buffer?"
-                  description="This is the breathing room left in your wallet this month. It shows the exact cash remaining after subtracting all your day-to-day recorded spending from your monthly income."
-                  example="If your income is INR 20,000 and you have spent INR 333 so far, your net buffer is INR 19,667. This is the unspent cash available for extra savings, investments, or surprise expenses."
+                  description="This is the breathing room left in your wallet this month after subtracting living expenses from income."
+                  example="If income is INR 20,000 and spends are INR 333, your net buffer is INR 19,667."
                 />
               </div>
               <div
@@ -911,7 +943,7 @@ export default function DashboardPage() {
                 <Wallet size={18} />
               </div>
             </div>
-          
+            
             <p
               className={`mt-4 text-3xl font-black tracking-tight ${
                 isSurplusNegative ? "text-red-700" : "text-emerald-950"
@@ -923,7 +955,7 @@ export default function DashboardPage() {
               </span>
               {formatAmount(analysis.remainingAfterActualExpenses)}
             </p>
-          
+            
             <div className="mt-4 text-xs font-bold text-neutral-600">
               {isSurplusNegative
                 ? "Deficit: Spends exceeded cashflow"
@@ -957,8 +989,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ================= 2. INTERACTIVE 2D PIE CHART SECTION ================= */}
-        <section className="mt-8">
+        {/* 3. Interactive 2D Pie Chart Section */}
+        <section>
           <div className="relative overflow-hidden rounded-[36px] border border-white/80 bg-white/50 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:shadow-[0_25px_60px_-10px_rgba(16,185,129,0.15)]">
             <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-400/25 blur-[70px]" />
             <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-cyan-400/20 blur-[70px]" />
@@ -974,18 +1006,14 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 
-                {/* Header Text with Help Button */}
                 <div className="mt-1 flex items-center gap-2">
                   <h2 className="text-2xl font-black tracking-tight text-neutral-950">
                     Capital Distribution
                   </h2>
                   <HelpPopover
                     title="How to Read This Chart"
-                    description="This chart divides your monthly income into three simple buckets: 
-                    (1) Fixed Commitments: like rent or EMIs that you must pay.
-                    (2) Living & Flexible Spends: Living Spends that you have recorded so far. 
-                    (3) Liquid Buffer: which is the remaining cash left to save or invest."
-                    example="If your income is INR 20,000, and you spend INR 333, the chart shows where every Rupee stands right now."
+                    description="This chart divides monthly income into: (1) Fixed Commitments, (2) Living & Flexible Spends, and (3) Liquid Buffer."
+                    example="If income is INR 20,000 and you spend INR 333, the chart reflects the live proportions."
                   />
                 </div>
                 <p className="mt-0.5 text-xs text-neutral-500">
@@ -1017,9 +1045,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ================= 3. DIFFERENTIATED FINANCIAL INTELLIGENCE & ACTION PLAYBOOK ================= */}
-        <section className="mt-8 space-y-6">
-          {/* Engine 1: Finora AI Financial Intelligence */}
+        {/* 4. Financial Intelligence & Playbook */}
+        <section className="space-y-6">
           <div className="overflow-hidden rounded-[36px] border border-white/80 bg-white/50 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
             <div className="mb-4 flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-sm">
@@ -1057,7 +1084,6 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Engine 2: Strategic Financial Playbook */}
           <div className="overflow-hidden rounded-[36px] border border-white/80 bg-white/50 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
             <div className="mb-4 flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-teal-600 to-cyan-600 text-white shadow-sm">
@@ -1077,8 +1103,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ================= 4. UPCOMING COMMITMENTS (RECURRING EXPENSES) ================= */}
-        <section className="mt-8">
+        {/* 5. Upcoming Commitments */}
+        <section>
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -1104,7 +1130,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Card 1: Monthly Total */}
             <div className="overflow-hidden rounded-[28px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-5 shadow-[0_15px_35px_-10px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
@@ -1125,7 +1150,6 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            {/* Card 2: Active Reminders */}
             <div className="overflow-hidden rounded-[28px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-5 shadow-[0_15px_35px_-10px_rgba(0,0,0,0.06),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
@@ -1143,7 +1167,6 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            {/* Card 3: Overdue / Need Attention */}
             <div
               className={`overflow-hidden rounded-[28px] border p-5 backdrop-blur-2xl transition hover:-translate-y-1 hover:shadow-xl sm:col-span-2 lg:col-span-1 ${
                 overdueRecurringExpenses.length > 0
@@ -1183,8 +1206,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ================= 5. YOUR GOALS (APPLE LIQUID GLASS) ================= */}
-        <section className="mt-8">
+        {/* 6. Goals Section */}
+        <section>
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -1282,8 +1305,8 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {/* ================= 6. CATEGORY BREAKDOWN & 4 WORKABLE CAPITAL RESERVES ================= */}
-        <section className="mt-8 grid gap-7 lg:grid-cols-[1.3fr_1.1fr]">
+        {/* 7. Category Breakdown & Capital Reserves */}
+        <section className="grid gap-7 lg:grid-cols-[1.3fr_1.1fr]">
           <div className="rounded-[36px] border border-white/80 bg-white/55 p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl">
             <CategoryBreakdown
               data={analysis.categoryBreakdown}
@@ -1307,7 +1330,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* NEW: Dedicated Accumulated Wealth Donut Chart */}
               <div className="mt-5">
                 <ReservesDistributionChart
                   savings={analysis.currentSavings}
@@ -1444,7 +1466,7 @@ export default function DashboardPage() {
                     onClick={() => openReserveManager("emi")}
                     className="flex items-center gap-1 rounded-xl border border-amber-200/60 bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-800 hover:bg-amber-100 transition active:scale-95"
                   >
-                    Edit Cap
+                    <Plus size={12} /> Edit Cap
                   </button>
                 </div>
               </div>
@@ -1461,8 +1483,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 7. Guidance Section */}
-        <section className="mt-10">
+        {/* 8. Guidance Cards */}
+        <section>
           <div className="mb-5">
             <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
               Automated Intelligence
@@ -1491,8 +1513,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 8. Quick Launch Cards */}
-        <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        {/* 9. Quick Launch Navigation Cards */}
+        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <div
             onClick={() => router.push("/expenses")}
             className="group cursor-pointer rounded-[32px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-7 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-2xl transition hover:-translate-y-1.5 hover:border-emerald-300 hover:shadow-xl"
@@ -1600,7 +1622,7 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* Logout Modal */}
+      {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -1668,7 +1690,6 @@ export default function DashboardPage() {
         onClose={() => setShowReservesModal(false)}
         onSuccess={async (appliedUpdates) => {
           if (appliedUpdates && profile) {
-            // 1. Instantly update local profile state
             const updatedProfile = {
               ...profile,
               ...(appliedUpdates.currentSavings !== undefined && {
@@ -1691,7 +1712,6 @@ export default function DashboardPage() {
             };
             setProfile(updatedProfile);
 
-            // 2. Instantly recalculate the financial analysis engine
             const raw = updatedProfile as any;
             const freshEngineInput: FinancialProfileForEngine = {
               monthlyIncome: Number(raw.monthlyIncome ?? 0),
@@ -1717,7 +1737,6 @@ export default function DashboardPage() {
             setAnalysis(recalculated);
           }
 
-          // 3. Re-sync in the background from Firestore
           await loadDashboard();
         }}
       />

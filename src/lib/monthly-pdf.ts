@@ -5,6 +5,7 @@ interface CategoryBreakdownItem {
   category: string;
   budget: number;
   amount: number;
+  previousMonthAmount?: number; // MoM support
   budgetUsedPercentage: number;
 }
 
@@ -21,6 +22,7 @@ interface MonthlyReportPDFData {
   budgetUsed: number;
   recurringCommitment: number;
   categoryBreakdown: CategoryBreakdownItem[];
+  previousMonthTotalExpenses?: number; // Total MoM comparison
 }
 
 export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
@@ -34,7 +36,6 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
   const pageHeight = 297;
   const margin = 14;
 
-  // Format currency helper
   const fmt = (num: number) =>
     `${data.currency} ${Math.round(num).toLocaleString("en-IN")}`;
 
@@ -42,7 +43,6 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
   doc.setFillColor(23, 61, 50); // Finora Emerald #173D32
   doc.rect(0, 0, pageWidth, 32, "F");
 
-  // Accent Line
   doc.setFillColor(16, 185, 129); // Mint accent
   doc.rect(0, 31, pageWidth, 1.5, "F");
 
@@ -71,6 +71,14 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
   doc.setFontSize(11);
   doc.text("1. FISCAL FLOW PERFORMANCE SUMMARY", margin, 42);
 
+  // Calculate MoM overall delta
+  let momOverallText = "Baseline Month";
+  if (data.previousMonthTotalExpenses && data.previousMonthTotalExpenses > 0) {
+    const diff = data.totalExpenses - data.previousMonthTotalExpenses;
+    const pct = ((diff / data.previousMonthTotalExpenses) * 100).toFixed(1);
+    momOverallText = diff > 0 ? `+${pct}% vs Last Month` : `-${pct}% vs Last Month`;
+  }
+
   const kpiData = [
     [
       "Total Monthly Inflow",
@@ -87,8 +95,8 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
     [
       "Allocated Budget Cap",
       fmt(data.budgetTotal),
-      "Budget Consumed",
-      fmt(data.budgetUsed),
+      "MoM Outflow Trend",
+      momOverallText,
     ],
     [
       "Recurring Commitments",
@@ -111,7 +119,7 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
     },
   });
 
-  // ================= 3. VECTOR PIE CHART & EXPENSE BREAKDOWN =================
+  // ================= 3. VECTOR PIE CHART =================
   let currentY = (doc as any).lastAutoTable.finalY + 10;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -120,23 +128,20 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
 
   const totalExpenseVal = data.categoryBreakdown.reduce((acc, c) => acc + c.amount, 0);
 
-  // Palette for chart wedges
   const colors: [number, number, number][] = [
-    [23, 61, 50],    // Dark Emerald
-    [16, 185, 129],  // Mint Green
-    [14, 165, 233],  // Sky Blue
-    [245, 158, 11],  // Amber
-    [168, 85, 247],  // Purple
-    [236, 72, 153],  // Rose Pink
-    [100, 116, 139], // Slate Gray
+    [23, 61, 50],
+    [16, 185, 129],
+    [14, 165, 233],
+    [245, 158, 11],
+    [168, 85, 247],
+    [236, 72, 153],
+    [100, 116, 139],
   ];
 
-  // Draw Pie Chart if expense data exists
   if (totalExpenseVal > 0) {
     const chartCenterX = 45;
     const chartCenterY = currentY + 30;
     const radius = 20;
-
     let currentAngle = -Math.PI / 2;
 
     data.categoryBreakdown.forEach((item, index) => {
@@ -150,7 +155,6 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
       doc.setDrawColor(255, 255, 255);
       doc.setLineWidth(0.5);
 
-      // Render arc wedge using pie vector approximation
       const steps = Math.max(10, Math.floor(sliceAngle * 25));
       const points: [number, number][] = [[chartCenterX, chartCenterY]];
 
@@ -162,7 +166,6 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
         ]);
       }
 
-      // Draw polygon wedge
       doc.lines(
         points.slice(1).map((pt, i) => [
           pt[0] - points[i][0],
@@ -178,7 +181,6 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
       currentAngle += sliceAngle;
     });
 
-    // Legend on the right of the Pie Chart
     let legendY = currentY + 14;
     const legendX = 85;
 
@@ -206,10 +208,10 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
     currentY += 8;
   }
 
-  // ================= 4. CATEGORY VARIANCE TABLE =================
+  // ================= 4. CATEGORY VARIANCE TABLE WITH MoM DELTA =================
   autoTable(doc, {
     startY: currentY,
-    head: [["Expenditure Stream", "Allocated Target", "Actual Spending", "Budget Burn %", "Variance Status"]],
+    head: [["Expenditure Stream", "Allocated Target", "Actual Spending", "MoM Trend", "Variance Status"]],
     body: data.categoryBreakdown.map((item) => {
       const variance = item.budget > 0 ? item.budget - item.amount : 0;
       const status =
@@ -219,11 +221,21 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
           ? `+${fmt(variance)} (Under)`
           : `-${fmt(Math.abs(variance))} (Over)`;
 
+      // MoM calculation per category
+      let momDelta = "—";
+      if (typeof item.previousMonthAmount === "number" && item.previousMonthAmount > 0) {
+        const change = item.amount - item.previousMonthAmount;
+        const pct = ((change / item.previousMonthAmount) * 100).toFixed(1);
+        momDelta = change > 0 ? `+${pct}%` : `${pct}%`;
+      } else if (item.previousMonthAmount === 0 && item.amount > 0) {
+        momDelta = "New (+100%)";
+      }
+
       return [
         item.category,
         item.budget > 0 ? fmt(item.budget) : "Not set",
         fmt(item.amount),
-        item.budget > 0 ? `${item.budgetUsedPercentage.toFixed(1)}%` : "N/A",
+        momDelta,
         status,
       ];
     }),
@@ -236,21 +248,21 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
     },
     styles: { fontSize: 8, cellPadding: 2.2 },
     columnStyles: {
-      0: { fontStyle: "bold", textColor: [30, 41, 59] },
-      4: { fontStyle: "bold" },
+      0: { fontStyle: "bold", textColor: [30, 41, 59], cellWidth: 45 },
+      1: { cellWidth: 32 },
+      2: { cellWidth: 32 },
+      3: { fontStyle: "bold", cellWidth: 28 }, // MoM column
+      4: { fontStyle: "bold", cellWidth: 45 },
     },
   });
 
-  // ================= 5. EXECUTIVE NOTE & FISCAL ADVISORY =================
+  // ================= 5. EXECUTIVE ADVISORY NOTE =================
   let finalY = (doc as any).lastAutoTable.finalY + 8;
-
-  // Check if we need to fit comfortably before page bottom
   if (finalY > pageHeight - 45) {
     doc.addPage();
     finalY = 20;
   }
 
-  // Advisory Note Card Box
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.4);
@@ -261,7 +273,6 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
   doc.setFontSize(9.5);
   doc.text("EXECUTIVE ADVISORY & AUDIT SUMMARY", margin + 4, finalY + 6);
 
-  // Dynamic Intelligence Commentary
   let commentary = "";
   if (data.totalSavings < 0) {
     commentary = `CRITICAL DEFICIT DETECTED: Total expenditure exceeded monthly income by ${fmt(
@@ -285,7 +296,6 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
   const splitCommentary = doc.splitTextToSize(commentary, pageWidth - margin * 2 - 8);
   doc.text(splitCommentary, margin + 4, finalY + 13);
 
-  // Signoff stamp
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
@@ -295,6 +305,5 @@ export function generateMonthlyExecutivePDF(data: MonthlyReportPDFData) {
     finalY + 30
   );
 
-  // Save the PDF
   doc.save(`Finora_Executive_Report_${data.monthKey}.pdf`);
 }
