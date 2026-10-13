@@ -1,0 +1,210 @@
+/* =========================================================================
+   1. MOBILE & TABLET (< 768px): SINGLE-FORM CLEAN TOP-CURTAIN VIEW
+   ========================================================================= */
+
+.authBox {
+  position: relative;
+  width: 100vw;
+  min-height: 100dvh;
+  overflow: hidden;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fixed Mobile Top Hero Header */
+.mobileTopHeader {
+  position: relative;
+  width: 100%;
+  padding: 2.75rem 1.75rem 2rem 1.75rem;
+  background: linear-gradient(165deg, #173d32 0%, #1f5c4a 60%, #10b981 100%);
+  border-bottom-left-radius: 36px;
+  border-bottom-right-radius: 36px;
+  box-shadow: 0 12px 30px rgba(23, 61, 50, 0.15);
+  color: #ffffff;
+  z-index: 5;
+}
+
+/* Fullscreen Curtain Wiper (Animated Dropdown) */
+.mobileCurtainOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 160vw;
+  height: 160vh;
+  background: linear-gradient(135deg, #173d32 0%, #1f5c4a 55%, #10b981 100%);
+  z-index: 50;
+  pointer-events: none;
+  /* Parked off-screen towards the top-left */
+  transform: translate(-105%, -105%);
+  border-bottom-right-radius: 80px;
+  box-shadow: 15px 15px 50px rgba(0, 0, 0, 0.35);
+  transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.curtainActive {
+  transform: translate(0%, 0%) !important;
+  pointer-events: auto !important;
+}
+
+/* Mobile Form Container */
+.authRow {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  z-index: 2;
+  padding: 1.5rem 1.5rem 2.5rem 1.5rem;
+}
+
+.authCol {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.formWrapper {
+  width: 100%;
+  max-width: 24rem;
+}
+
+.formCard {
+  width: 100%;
+}
+
+/* Hide desktop layers on mobile */
+.contentRow {
+  display: none;
+}
+
+/* =========================================================================
+   2. DESKTOP & LAPTOP (>= 768px): ORIGINAL BOXED HORIZONTAL SLIDER
+   ========================================================================= */
+
+@media (min-width: 768px) {
+  .mobileTopHeader,
+  .mobileCurtainOverlay {
+    display: none !important;
+  }
+
+  .authBox {
+    position: relative;
+    width: 100%;
+    max-width: 56rem; /* max-w-4xl */
+    height: 610px;
+    min-height: 610px;
+    border-radius: 2rem;
+    background-color: #ffffff;
+    border: 1px solid #e7e5df;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.08);
+    display: block;
+    overflow: hidden;
+  }
+
+  .authRow {
+    flex-direction: row;
+    height: 100%;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .authCol {
+    width: 50%;
+    height: 100%;
+    padding: 0;
+    z-index: 5;
+  }
+
+  .formWrapper {
+    max-width: 24rem;
+    padding: 1.5rem;
+  }
+
+  .formCard {
+    transform: scale(0);
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition-delay: 0.7s;
+  }
+
+  .isSignIn .formSignIn,
+  .isSignUp .formSignUp {
+    transform: scale(1);
+  }
+
+  /* Desktop Brand Overlay */
+  .contentRow {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 7;
+  }
+
+  .textContent {
+    padding: 2.5rem;
+    color: #ffffff;
+    width: 100%;
+    max-width: 24rem;
+  }
+
+  .textSignIn h1,
+  .textSignIn h2,
+  .textSignIn p,
+  .textSignIn div {
+    transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(-200%);
+  }
+
+  .textSignUp h1,
+  .textSignUp h2,
+  .textSignUp p,
+  .textSignUp div {
+    transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(200%);
+  }
+
+  .isSignIn .textSignIn h1,
+  .isSignIn .textSignIn h2,
+  .isSignIn .textSignIn p,
+  .isSignIn .textSignIn div,
+  .isSignUp .textSignUp h1,
+  .isSignUp .textSignUp h2,
+  .isSignUp .textSignUp p,
+  .isSignUp .textSignUp div {
+    transform: translateX(0);
+  }
+
+  /* Desktop Diagonal Sliding Wave Curve */
+  .authBox::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 200%;
+    background-image: linear-gradient(-45deg, #173d32 0%, #1f5c4a 100%);
+    border-bottom-right-radius: 350px;
+    border-top-left-radius: 350px;
+    transform: translate(25%, 0);
+    transition: transform 0.9s cubic-bezier(0.77, 0, 0.175, 1);
+    z-index: 6;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  .authBox.isSignIn::before {
+    transform: translate(0, 0);
+    right: 50%;
+  }
+
+  .authBox.isSignUp::before {
+    transform: translate(100%, 0);
+    right: 50%;
+  }
+}
