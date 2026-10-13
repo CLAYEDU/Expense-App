@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Sparkles } from "lucide-react";
 
@@ -30,6 +30,30 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // 1. Audio Reference
+  const transitionAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // 2. Pre-load audio on client mount
+    if (typeof window !== "undefined") {
+      const audio = new Audio("/usheey.mp3");
+      audio.preload = "auto";
+      audio.volume = 0.6; // Adjust volume level (0.0 to 1.0)
+      transitionAudioRef.current = audio;
+    }
+  }, []);
+
+  function playFunnySound() {
+    if (transitionAudioRef.current) {
+      // Reset playback to start in case user clicks quickly back-and-forth
+      transitionAudioRef.current.currentTime = 0;
+      transitionAudioRef.current.play().catch((err) => {
+        // Silently catch autoplay errors if any
+        console.debug("Audio play prevented:", err);
+      });
+    }
+  }
+
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 100);
     
@@ -46,7 +70,8 @@ export default function LoginPage() {
 
   function toggleMode(targetSignIn: boolean) {
     if (isSignIn === targetSignIn || curtainActive) return;
-    setError("");
+    // 3. Play sound right as transition starts
+    playFunnySound();
 
     if (isMobile) {
       // 1. Drop the green curtain down over the viewport
