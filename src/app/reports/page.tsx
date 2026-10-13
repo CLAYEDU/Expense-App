@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
   Calendar,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
+  FileSpreadsheet,
   FileText,
   Info,
   Sparkles,
@@ -33,6 +35,7 @@ import {
 } from "@/lib/monthly-reports";
 
 import MonthlyReportView from "@/components/reports/MonthlyReportView";
+import { generateMonthlyExecutivePDF } from "@/lib/monthly-pdf";
 
 export default function ReportsPage() {
   const router = useRouter();
@@ -45,6 +48,20 @@ export default function ReportsPage() {
 
   const [monthKey, setMonthKey] = useState(() => getMonthKey(new Date()));
   const [loading, setLoading] = useState(true);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close download menu on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setDownloadMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -102,6 +119,7 @@ export default function ReportsPage() {
 
   function exportCSV() {
     if (!report || !profile) return;
+    setDownloadMenuOpen(false);
 
     const rows = [
       ["Monthly Financial Report", report.monthLabel],
@@ -166,6 +184,30 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   }
 
+  function exportPDF() {
+    if (!report || !profile) return;
+    setDownloadMenuOpen(false);
+
+    generateMonthlyExecutivePDF({
+      currency: profile.currency,
+      monthLabel: report.monthLabel,
+      monthKey,
+      totalIncome: report.totalIncome,
+      totalExpenses: report.totalExpenses,
+      totalSavings: report.totalSavings,
+      savingsRate: report.savingsRate,
+      budgetTotal: report.budgetTotal,
+      budgetUsed: report.budgetUsed,
+      recurringCommitment: report.recurringMonthlyCommitment,
+      categoryBreakdown: report.categoryBreakdown.map((item) => ({
+        category: item.category,
+        budget: item.budget,
+        amount: item.amount,
+        budgetUsedPercentage: item.budgetUsedPercentage,
+      })),
+    });
+  }
+
   // Loading state with Apple Ambient Glass skeleton
   if (authLoading || loading || !profile) {
     return (
@@ -204,11 +246,8 @@ export default function ReportsPage() {
     <main className="relative min-h-screen bg-[#edf2ee] text-neutral-900 antialiased selection:bg-emerald-500/20 selection:text-emerald-900">
       {/* ================= APPLE AMBIENT LIVING AURORA BACKGROUND ================= */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        {/* Vibrant Emerald Aurora (Top-Right) */}
         <div className="absolute -top-36 -right-24 h-[620px] w-[620px] rounded-full bg-gradient-to-br from-emerald-400/50 via-teal-300/40 to-emerald-200/25 blur-[120px]" />
-        {/* Electric Mint & Cyan Aurora (Left Edge) */}
         <div className="absolute top-[25%] -left-36 h-[650px] w-[650px] rounded-full bg-gradient-to-tr from-teal-400/40 via-emerald-300/35 to-cyan-300/30 blur-[140px]" />
-        {/* Soft Depth Aura (Bottom-Right) */}
         <div className="absolute -bottom-36 right-[15%] h-[580px] w-[580px] rounded-full bg-gradient-to-t from-cyan-300/35 via-emerald-200/30 to-transparent blur-[130px]" />
       </div>
 
@@ -242,14 +281,44 @@ export default function ReportsPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={exportCSV}
-              className="inline-flex items-center gap-2 self-start rounded-2xl bg-[#173d32] px-5 py-3 text-xs font-bold text-white shadow-[0_12px_28px_rgba(23,61,50,0.25)] transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95 lg:self-auto"
-            >
-              <Download size={15} />
-              Export CSV
-            </button>
+            {/* ================= UNIFIED DOWNLOAD ACTION DROPDOWN ================= */}
+            <div className="relative self-start lg:self-auto" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setDownloadMenuOpen((prev) => !prev)}
+                className="inline-flex items-center gap-2.5 rounded-2xl bg-[#173d32] px-5 py-3 text-xs font-bold text-white shadow-[0_12px_28px_rgba(23,61,50,0.25)] transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95"
+              >
+                <Download size={15} />
+                <span>Download</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-200 ${
+                    downloadMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {downloadMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 z-50 w-48 overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-1.5 shadow-2xl backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    onClick={exportCSV}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100 hover:text-emerald-800"
+                  >
+                    <FileSpreadsheet size={15} className="text-emerald-700" />
+                    <span>Download CSV</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportPDF}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100 hover:text-emerald-800"
+                  >
+                    <FileText size={15} className="text-emerald-700" />
+                    <span>Download PDF</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ================= FROSTED GLASS MONTH SELECTOR ================= */}
