@@ -2,20 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Sparkles, Target, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  SlidersHorizontal,
+  Sparkles,
+  Target,
+} from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { getFinancialProfile } from "@/lib/financial-profile";
 import { getExpenses, Expense } from "@/lib/expenses";
 import { getBudgets, BudgetMap } from "@/lib/budgets";
 import { analyzeBudget, BudgetSummary } from "@/lib/budget-engine";
+import { generateBudgetPlanPDF } from "@/lib/budget-pdf-export";
+import type { FinancialProfile } from "@/types/finance";
 
 import BudgetEditor from "@/lib/BudgetEditor";
 import BudgetComparison from "@/components/financial/BudgetComparison";
-
-interface FinancialProfile {
-  currency: "INR" | "AED";
-}
 
 export default function BudgetPage() {
   const { user, loading: authLoading } = useAuth();
@@ -25,6 +29,41 @@ export default function BudgetPage() {
   const [budgets, setBudgets] = useState<BudgetMap | null>(null);
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [loading, setLoading] = useState(true);
+
+  async function handleDownloadBudgetPDF() {
+    if (!budgets || !profile) return;
+
+    const raw = profile as any;
+    const totalCapped = Object.values(budgets).reduce(
+      (sum, val) => sum + (Number(val) || 0),
+      0
+    );
+    const monthlyIncome = Number(raw.monthlyIncome) || 0;
+    const savingsTarget =
+      Number(raw.monthlySavings ?? raw.monthlySavingsTarget) || 0;
+    const emiAmount =
+      Number(raw.emiAmount ?? raw.monthlyEmi ?? raw.emi) || 0;
+    const unallocated = monthlyIncome - (totalCapped + savingsTarget + emiAmount);
+
+    const budgetItems = Object.entries(budgets).map(([category, amount]) => ({
+      category,
+      budgetAmount: Number(amount) || 0,
+      sharePercentage:
+        totalCapped > 0 ? ((Number(amount) || 0) / totalCapped) * 100 : 0,
+    }));
+
+    await generateBudgetPlanPDF({
+      userName: user?.displayName || undefined,
+      userEmail: user?.email || undefined,
+      currency: profile.currency,
+      monthlyIncome,
+      totalBudgetCapped: totalCapped,
+      unallocatedBuffer: unallocated,
+      savingsTarget,
+      emiAmount,
+      budgets: budgetItems,
+    });
+  }
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -43,9 +82,7 @@ export default function BudgetPage() {
         return;
       }
 
-      const typedProfile = financialProfile as FinancialProfile;
-
-      setProfile(typedProfile);
+      setProfile(financialProfile as FinancialProfile);
       setBudgets(savedBudgets);
 
       const analysis = analyzeBudget(savedBudgets, expenses);
@@ -90,11 +127,8 @@ export default function BudgetPage() {
     <main className="relative min-h-screen bg-[#edf2ee] text-neutral-900 antialiased selection:bg-emerald-500/20 selection:text-emerald-900">
       {/* ================= APPLE AMBIENT LIVING AURORA BACKGROUND ================= */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        {/* Vibrant Emerald Aurora (Top-Right) */}
         <div className="absolute -top-36 -right-24 h-[620px] w-[620px] rounded-full bg-gradient-to-br from-emerald-400/50 via-teal-300/40 to-emerald-200/25 blur-[120px]" />
-        {/* Electric Mint & Cyan Aurora (Left Edge) */}
         <div className="absolute top-[25%] -left-36 h-[650px] w-[650px] rounded-full bg-gradient-to-tr from-teal-400/40 via-emerald-300/35 to-cyan-300/30 blur-[140px]" />
-        {/* Subtle Warm Violet/Teal Depth Aura (Bottom-Right) */}
         <div className="absolute -bottom-36 right-[15%] h-[580px] w-[580px] rounded-full bg-gradient-to-t from-cyan-300/35 via-emerald-200/30 to-transparent blur-[130px]" />
       </div>
 
@@ -116,19 +150,30 @@ export default function BudgetPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            className="inline-flex items-center gap-2 self-start rounded-2xl border border-white/85 bg-white/70 px-5 py-3 text-xs font-bold text-neutral-800 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl transition-all duration-300 hover:bg-white hover:shadow-[0_15px_30px_-5px_rgba(0,0,0,0.08)] active:scale-95 sm:self-auto"
-          >
-            <ArrowLeft size={16} />
-            Back to dashboard
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleDownloadBudgetPDF}
+              className="flex items-center gap-2 rounded-2xl bg-[#173d32] px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-[#173d32]/20 transition hover:bg-[#1f5c4a] hover:scale-105 active:scale-95"
+            >
+              <Download size={14} />
+              <span>Download Budget PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="inline-flex items-center gap-2 self-start rounded-2xl border border-white/85 bg-white/70 px-5 py-3 text-xs font-bold text-neutral-800 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05),inset_0_1px_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl transition-all duration-300 hover:bg-white hover:shadow-[0_15px_30px_-5px_rgba(0,0,0,0.08)] active:scale-95 sm:self-auto"
+            >
+              <ArrowLeft size={16} />
+              Back to dashboard
+            </button>
+          </div>
         </header>
 
         {/* ================= LIQUID GLASS WORKSPACE GRID ================= */}
         <div className="grid gap-8 lg:grid-cols-[430px_1fr]">
-          {/* Left Column: Budget Editor Wrapped in Liquid Glass */}
+          {/* Left Column: Budget Editor */}
           <div className="overflow-hidden rounded-[36px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-6 sm:p-7 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition hover:shadow-[0_25px_50px_-10px_rgba(16,185,129,0.12)]">
             <div className="mb-5 flex items-center justify-between border-b border-black/5 pb-4">
               <div className="flex items-center gap-2.5">
@@ -157,7 +202,7 @@ export default function BudgetPage() {
             />
           </div>
 
-          {/* Right Column: Comparison Card Wrapped in Aqua Frost Glass */}
+          {/* Right Column: Comparison Card */}
           <div className="overflow-hidden rounded-[36px] border border-white/80 bg-gradient-to-br from-white/75 via-white/55 to-white/40 p-6 sm:p-7 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08),inset_0_1px_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition hover:shadow-[0_25px_50px_-10px_rgba(6,182,212,0.12)]">
             <div className="mb-5 flex items-center justify-between border-b border-black/5 pb-4">
               <div className="flex items-center gap-2.5">
